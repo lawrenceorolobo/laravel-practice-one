@@ -2,24 +2,57 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Admin;
+use App\Models\Setting;
+use App\Models\SubscriptionPlan;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Seed Super Admin
+        Admin::firstOrCreate(
+            ['email' => 'admin@quizly.com'],
+            [
+                'name' => 'Super Admin',
+                'password' => 'QuizlyAdmin@2026!',
+                'role' => 'super_admin',
+                'is_active' => true,
+            ]
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Seed Subscription Plan
+        SubscriptionPlan::firstOrCreate(
+            ['name' => 'Professional'],
+            [
+                'monthly_price' => 5000.00, // NGN
+                'annual_discount_percent' => 15.00,
+                'features' => [
+                    'max_assessments' => 100,
+                    'max_invites_per_assessment' => 1000,
+                    'max_questions_per_assessment' => 200,
+                    'analytics' => true,
+                    'export_results' => true,
+                    'custom_branding' => true,
+                ],
+                'is_active' => true,
+            ]
+        );
+
+        // Seed Default Settings
+        $settings = [
+            ['key' => 'platform_name', 'value' => 'Quizly', 'type' => 'string', 'description' => 'Platform display name'],
+            ['key' => 'annual_discount_percent', 'value' => '15', 'type' => 'float', 'description' => 'Annual subscription discount percentage'],
+            ['key' => 'fuzzy_match_threshold', 'value' => '85', 'type' => 'int', 'description' => 'Name similarity threshold for fraud detection (%)'],
+            ['key' => 'max_email_batch_size', 'value' => '50', 'type' => 'int', 'description' => 'Max emails per batch (Migadu limits)'],
+            ['key' => 'email_batch_delay_seconds', 'value' => '60', 'type' => 'int', 'description' => 'Delay between email batches'],
+            ['key' => 'rate_limit_api', 'value' => '100', 'type' => 'int', 'description' => 'API requests per minute'],
+            ['key' => 'rate_limit_auth', 'value' => '5', 'type' => 'int', 'description' => 'Auth requests per minute'],
+        ];
+
+        foreach ($settings as $setting) {
+            Setting::firstOrCreate(['key' => $setting['key']], $setting);
+        }
     }
 }
