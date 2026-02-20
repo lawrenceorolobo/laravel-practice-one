@@ -22,9 +22,8 @@
             border-radius: 0.75rem;
         }
         .skeleton-glass {
-            background: rgba(255,255,255,0.03);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.06);
+            border: 1px solid rgba(0,0,0,0.08);
             position: relative;
             overflow: hidden;
         }
@@ -37,9 +36,20 @@
             height: 100%;
             background: linear-gradient(90deg, 
                 transparent 0%, 
-                rgba(255,255,255,0.1) 50%, 
+                rgba(0,0,0,0.04) 50%, 
                 transparent 100%);
             animation: skeleton-shimmer 1.5s infinite;
+        }
+        body.dark .skeleton-glass {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        body.dark .skeleton-glass::after {
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255,255,255,0.1) 50%, 
+                transparent 100%);
         }
         @keyframes skeleton-shimmer {
             0% { background-position: -200% 0; }
@@ -89,15 +99,15 @@
         .sidebar-link.active { background: rgba(99, 102, 241, 0.1); color: #4f46e5; }
         
         /* Override Tailwind dark classes in light mode */
-        .bg-slate-800 { background: #ffffff !important; }
-        .bg-slate-700 { background: #f1f5f9 !important; }
+        .bg-slate-800 { background: #ffffff !important; border: 1px solid #e2e8f0 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+        .bg-slate-700 { background: #f8fafc !important; }
         .border-slate-700 { border-color: #e2e8f0 !important; }
         .border-slate-600 { border-color: #cbd5e1 !important; }
         .text-white { color: #1e293b !important; }
         .text-slate-300 { color: #475569 !important; }
         .text-slate-400 { color: #64748b !important; }
         .text-slate-500 { color: #94a3b8 !important; }
-        .hover\:bg-slate-700:hover { background: #e2e8f0 !important; }
+        .hover\:bg-slate-700:hover { background: #f1f5f9 !important; }
         
         /* Dark Mode - restore original dark colors */
         body.dark { background: #0f172a; color: #f1f5f9; }

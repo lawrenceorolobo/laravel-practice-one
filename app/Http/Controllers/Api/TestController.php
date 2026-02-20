@@ -84,6 +84,8 @@ class TestController extends Controller
                 'duration_minutes' => $assessment->duration_minutes,
             ],
             'email' => $invitee->email,
+            'first_name' => $invitee->first_name,
+            'last_name' => $invitee->last_name,
         ]);
     }
 
@@ -350,11 +352,21 @@ class TestController extends Controller
             ];
         }
 
-        // Notify business admin via WebSocket and Email
-        \App\Events\AssessmentCompleted::dispatch($invitee->assessment, [
-            'score' => $session->percentage,
-            'candidate_name' => "{$invitee->first_name} {$invitee->last_name}",
-        ]);
+        // Send separate result emails (queued)
+        $assessment = $invitee->assessment->load('user');
+        dispatch(function () use ($assessment, $invitee, $session) {
+            try {
+                // Email to assessment creator (business admin)
+                $ownerMail = new \App\Mail\AssessmentResultMail($assessment, $invitee, $session);
+                \Illuminate\Support\Facades\Mail::to($assessment->user->email)->send($ownerMail);
+
+                // Separate email to candidate (test taker)
+                $candidateMail = new \App\Mail\CandidateResultMail($assessment, $invitee, $session);
+                \Illuminate\Support\Facades\Mail::to($invitee->email)->send($candidateMail);
+            } catch (\Exception $e) {
+                \Log::warning("Result email failed: " . $e->getMessage());
+            }
+        });
 
         return response()->json($result);
     }
@@ -393,5 +405,117 @@ class TestController extends Controller
             $session->update(['status' => 'timed_out']);
             $session->invitee->update(['status' => 'completed']);
         }
+    }
+
+    /**
+     * Validate public access code and return assessment info
+     */
+    public function validateAccessCode(Request $request, string $accessCode): JsonResponse
+    {
+        $assessment = Assessment::where('access_code', $accessCode)
+            ->whereIn('status', ['active', 'scheduled'])
+            ->first();
+
+        if (!$assessment) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'This assessment link is invalid or has expired.',
+            ], 404);
+        }
+
+        if (!$assessment->isActive()) {
+            $message = match (true) {
+                $assessment->start_datetime && $assessment->start_datetime->isFuture() => 'This assessment has not started yet. It opens on ' . $assessment->start_datetime->format('M d, Y \a\t g:i A') . '.',
+                $assessment->end_datetime && $assessment->end_datetime->isPast() => 'This assessment has ended.',
+                default => 'This assessment is not currently available.',
+            };
+
+            return response()->json([
+                'valid' => false,
+                'message' => $message,
+            ], 403);
+        }
+
+        return response()->json([
+            'valid' => true,
+            'assessment' => [
+                'title' => $assessment->title,
+                'description' => $assessment->description,
+                'duration_minutes' => $assessment->duration_minutes,
+                'start_datetime' => $assessment->start_datetime,
+                'end_datetime' => $assessment->end_datetime,
+            ],
+        ]);
+    }
+
+    /**
+     * Join assessment via public access code (creates invitee + returns token)
+     */
+    public function joinByAccessCode(Request $request, string $accessCode): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+        ]);
+
+        $assessment = Assessment::where('access_code', $accessCode)
+            ->whereIn('status', ['active', 'scheduled'])
+            ->first();
+
+        if (!$assessment || !$assessment->isActive()) {
+            return response()->json([
+                'message' => 'This assessment is not available.',
+            ], 404);
+        }
+
+        $email = strtolower(trim($validated['email']));
+
+        // Check if already invited/started/completed
+        $existing = Invitee::where('assessment_id', $assessment->id)
+            ->where(DB::raw('LOWER(email)'), $email)
+            ->first();
+
+        if ($existing) {
+            if ($existing->hasCompleted()) {
+                return response()->json([
+                    'message' => 'You have already completed this assessment.',
+                ], 409);
+            }
+
+            if ($existing->hasStarted()) {
+                return response()->json([
+                    'message' => 'You have already started this assessment. Use your original link to continue.',
+                    'redirect_token' => $existing->invite_token,
+                ], 409);
+            }
+
+            // Already invited but hasn't started — redirect to their token
+            return response()->json([
+                'message' => 'You are already registered for this assessment.',
+                'redirect_token' => $existing->invite_token,
+            ]);
+        }
+
+        // Create new invitee with HMAC-signed token
+        $rawToken = \Illuminate\Support\Str::random(48);
+        $signature = hash_hmac('sha256', $rawToken . $email . $assessment->id, config('app.key'));
+        $inviteToken = $rawToken . '_' . substr($signature, 0, 16);
+
+        $invitee = Invitee::create([
+            'assessment_id' => $assessment->id,
+            'email' => $email,
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'invite_token' => $inviteToken,
+            'status' => 'pending',
+        ]);
+
+        $assessment->update(['total_invites' => $assessment->invitees()->count()]);
+
+        return response()->json([
+            'message' => 'Successfully registered for assessment.',
+            'redirect_token' => $invitee->invite_token,
+        ], 201);
     }
 }

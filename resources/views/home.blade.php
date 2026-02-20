@@ -48,18 +48,18 @@
         </div>
         
         <!-- Floating Stats -->
-        <div class="grid grid-cols-3 gap-8 max-w-2xl mx-auto mt-20 animate-fade-in-delay-3">
-            <div class="text-center bg-white rounded-2xl p-4 shadow-sm">
-                <div class="text-4xl font-bold text-slate-900">50K+</div>
-                <div class="text-slate-500 text-sm">Assessments</div>
+        <div class="grid grid-cols-3 gap-3 sm:gap-8 max-w-2xl mx-auto mt-20 animate-fade-in-delay-3 px-2">
+            <div class="text-center bg-white rounded-2xl p-3 sm:p-4 shadow-sm">
+                <div class="text-2xl sm:text-4xl font-bold text-slate-900">50K+</div>
+                <div class="text-slate-500 text-xs sm:text-sm">Assessments</div>
             </div>
-            <div class="text-center bg-white rounded-2xl p-4 shadow-sm">
-                <div class="text-4xl font-bold text-slate-900">1M+</div>
-                <div class="text-slate-500 text-sm">Test Takers</div>
+            <div class="text-center bg-white rounded-2xl p-3 sm:p-4 shadow-sm">
+                <div class="text-2xl sm:text-4xl font-bold text-slate-900">1M+</div>
+                <div class="text-slate-500 text-xs sm:text-sm">Test Takers</div>
             </div>
-            <div class="text-center bg-white rounded-2xl p-4 shadow-sm">
-                <div class="text-4xl font-bold text-slate-900">99.9%</div>
-                <div class="text-slate-500 text-sm">Uptime</div>
+            <div class="text-center bg-white rounded-2xl p-3 sm:p-4 shadow-sm">
+                <div class="text-2xl sm:text-4xl font-bold text-slate-900">99.9%</div>
+                <div class="text-slate-500 text-xs sm:text-sm">Uptime</div>
             </div>
         </div>
     </div>
@@ -118,9 +118,9 @@
         <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <!-- Card 1 -->
             <div class="tilt-card group relative bg-white rounded-3xl p-8 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 hover:-translate-y-2 reveal-on-scroll">
-                <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="absolute inset-0 bg-indigo-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="relative">
-                    <div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
@@ -132,9 +132,9 @@
             
             <!-- Card 2 -->
             <div class="group relative bg-white rounded-3xl p-8 shadow-sm hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 hover:-translate-y-2 reveal-on-scroll" style="animation-delay: 100ms">
-                <div class="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="absolute inset-0 bg-purple-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="relative">
-                    <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                         </svg>
@@ -146,9 +146,9 @@
             
             <!-- Card 3 -->
             <div class="group relative bg-white rounded-3xl p-8 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-500 hover:-translate-y-2 reveal-on-scroll" style="animation-delay: 200ms">
-                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="absolute inset-0 bg-emerald-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="relative">
-                    <div class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                         </svg>
@@ -160,9 +160,9 @@
             
             <!-- Card 4 -->
             <div class="group relative bg-white rounded-3xl p-8 shadow-sm hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 hover:-translate-y-2 reveal-on-scroll" style="animation-delay: 300ms">
-                <div class="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="absolute inset-0 bg-amber-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="relative">
-                    <div class="w-14 h-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-amber-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -174,9 +174,9 @@
             
             <!-- Card 5 -->
             <div class="group relative bg-white rounded-3xl p-8 shadow-sm hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-500 hover:-translate-y-2 reveal-on-scroll" style="animation-delay: 400ms">
-                <div class="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-pink-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="absolute inset-0 bg-rose-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="relative">
-                    <div class="w-14 h-14 bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-rose-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
@@ -188,9 +188,9 @@
             
             <!-- Card 6 -->
             <div class="group relative bg-white rounded-3xl p-8 shadow-sm hover:shadow-2xl hover:shadow-sky-500/10 transition-all duration-500 hover:-translate-y-2 reveal-on-scroll" style="animation-delay: 500ms">
-                <div class="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-blue-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="absolute inset-0 bg-sky-50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="relative">
-                    <div class="w-14 h-14 bg-gradient-to-br from-sky-500 to-sky-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-sky-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
@@ -215,7 +215,7 @@
         
         <div class="grid md:grid-cols-3 gap-12">
             <div class="text-center reveal-on-scroll">
-                <div class="relative inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl mb-8 shadow-lg shadow-indigo-500/30">
+                <div class="relative inline-flex items-center justify-center w-20 h-20 bg-indigo-600 rounded-3xl mb-8 shadow-lg shadow-indigo-500/30">
                     <span class="text-3xl font-black text-white">1</span>
                 </div>
                 <h3 class="text-2xl font-bold text-slate-900 mb-4">Create</h3>
@@ -223,7 +223,7 @@
             </div>
             
             <div class="text-center reveal-on-scroll" style="animation-delay: 150ms">
-                <div class="relative inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-3xl mb-8 shadow-lg shadow-purple-500/30">
+                <div class="relative inline-flex items-center justify-center w-20 h-20 bg-purple-600 rounded-3xl mb-8 shadow-lg shadow-purple-500/30">
                     <span class="text-3xl font-black text-white">2</span>
                 </div>
                 <h3 class="text-2xl font-bold text-slate-900 mb-4">Invite</h3>
@@ -231,7 +231,7 @@
             </div>
             
             <div class="text-center reveal-on-scroll" style="animation-delay: 300ms">
-                <div class="relative inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-pink-500 to-rose-600 rounded-3xl mb-8 shadow-lg shadow-pink-500/30">
+                <div class="relative inline-flex items-center justify-center w-20 h-20 bg-pink-600 rounded-3xl mb-8 shadow-lg shadow-pink-500/30">
                     <span class="text-3xl font-black text-white">3</span>
                 </div>
                 <h3 class="text-2xl font-bold text-slate-900 mb-4">Analyze</h3>
@@ -345,6 +345,10 @@ async function loadPricingPlans() {
         }).join('');
     } catch (e) {
         console.error('Failed to load pricing:', e);
+        document.getElementById('pricingGrid').innerHTML = `
+            <div class="col-span-3 text-center py-12">
+                <p class="text-slate-500 text-lg">No plans available yet. Please check back later.</p>
+            </div>`;
     }
 }
 loadPricingPlans();

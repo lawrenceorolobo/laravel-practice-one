@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicUid;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,9 +14,13 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, HasUuids, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, HasUuids, HasPublicUid, Notifiable, SoftDeletes;
+
+    protected string $uidPrefix = 'usr';
+    protected string $uidColumn = 'uid';
 
     protected $fillable = [
+        'uid',
         'first_name',
         'last_name',
         'email',

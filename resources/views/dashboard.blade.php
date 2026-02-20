@@ -593,7 +593,7 @@ async function loadAssessments() {
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-slate-600">${a.invitees_count || 0}</td>
-                            <td class="px-6 py-4 font-medium">${a.avg_score ? a.avg_score + '%' : '-'}</td>
+                            <td class="px-6 py-4 font-medium">${a.avg_score ? parseFloat(a.avg_score).toFixed(1) + '%' : '-'}</td>
                         </tr>
                     `;
                 }).join('');

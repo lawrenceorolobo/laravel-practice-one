@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 flex items-center justify-center p-6">
+<body class="min-h-screen bg-slate-900 flex items-center justify-center p-6">
 
     <div class="text-center max-w-md">
         <!-- Icon -->
@@ -26,7 +26,7 @@
 
         <!-- Actions -->
         <div class="space-y-3">
-            <a href="/" class="block w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all">
+            <a href="/" class="block w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 transition-all">
                 Go to Homepage
             </a>
             <button onclick="window.location.reload()" class="block w-full py-4 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-all">

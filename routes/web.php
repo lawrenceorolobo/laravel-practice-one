@@ -21,6 +21,12 @@ Route::view('/login', 'auth.login')->name('login');
 Route::view('/register', 'auth.register')->name('register');
 Route::view('/forgot-password', 'auth.forgot-password')->name('password.request');
 Route::view('/reset-password/{token}', 'auth.reset-password')->name('password.reset');
+Route::view('/verify-email', 'auth.verify-email')->name('verify-email');
+
+// Payment pages
+Route::view('/select-plan', 'payment.select-plan')->name('select-plan');
+Route::get('/payment/callback', [\App\Http\Controllers\Api\PaymentController::class, 'callback'])->name('payment.callback');
+Route::view('/payment/verifying', 'payment.verifying')->name('payment.verifying');
 
 // Email Verification Routes
 Route::get('/email/verify', function () {
@@ -62,6 +68,11 @@ Route::view('/settings', 'user.settings')->name('settings');
 Route::get('/test/{token}', function ($token) {
     return view('test.take', ['token' => $token]);
 })->name('test.take');
+
+// Public assessment link (anyone with access code can join)
+Route::get('/join/{accessCode}', function ($accessCode) {
+    return view('test.join', ['accessCode' => $accessCode]);
+})->name('test.join');
 
 // Admin pages
 Route::view('/admin/login', 'auth.admin-login')->name('admin.login');

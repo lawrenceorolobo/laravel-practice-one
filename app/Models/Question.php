@@ -15,6 +15,7 @@ class Question extends Model
         'assessment_id',
         'question_text',
         'question_type',
+        'expected_answer',
         'points',
         'question_order',
     ];

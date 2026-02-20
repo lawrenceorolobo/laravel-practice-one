@@ -13,9 +13,9 @@ class RateLimitByTier
      * Rate limit tiers for different endpoint types
      */
     protected array $tiers = [
-        'auth' => ['limit' => 5, 'window' => 60],
-        'api' => ['limit' => 100, 'window' => 60],
-        'test' => ['limit' => 1, 'window' => 5],
+        'auth' => ['limit' => 10, 'window' => 60],
+        'api' => ['limit' => 120, 'window' => 60],
+        'test' => ['limit' => 30, 'window' => 60],
         'webhook' => ['limit' => 50, 'window' => 60],
     ];
 
@@ -47,6 +47,8 @@ class RateLimitByTier
     protected function resolveKey(Request $request, string $tier): string
     {
         $identifier = $request->user()?->id ?? $request->ip();
-        return "rate_limit:{$tier}:{$identifier}";
+        // Include path segment so different endpoints don't share the same bucket
+        $path = $request->path();
+        return "rate_limit:{$tier}:{$identifier}:{$path}";
     }
 }

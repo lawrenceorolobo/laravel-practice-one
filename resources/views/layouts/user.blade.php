@@ -14,7 +14,7 @@
         @keyframes skel { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
         .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 40px -12px rgba(0,0,0,0.15); }
-        .sidebar-link.active { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; }
+        .sidebar-link.active { background: #4f46e5; color: white; }
         
         /* Dark Mode */
         body.dark { background: #0f172a; color: #f1f5f9; }
@@ -120,7 +120,7 @@
 
         <div class="p-4 border-t border-slate-200/50">
             <div class="flex items-center gap-3 p-3 rounded-xl">
-                <div class="w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold" id="userAvatar">U</div>
+                <div class="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold" id="userAvatar">U</div>
                 <div class="flex-1 min-w-0">
                     <p class="font-semibold text-slate-900 truncate" id="userName">Loading...</p>
                     <p class="text-sm text-slate-500 truncate" id="userEmail">...</p>
@@ -155,6 +155,18 @@ else {
     document.getElementById('userName').textContent = `${user.first_name} ${user.last_name}`;
     document.getElementById('userEmail').textContent = user.email;
     document.getElementById('userAvatar').textContent = user.first_name?.charAt(0).toUpperCase() || 'U';
+    
+    // Check subscription status from server (localStorage may be stale after payment)
+    fetch('/api/auth/profile', { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => {
+            const u = data.user || data;
+            localStorage.setItem('user', JSON.stringify(u));
+            if (!u.has_active_subscription && u.subscription_status !== 'active') {
+                window.location.href = '/select-plan';
+            }
+        })
+        .catch(() => { /* token invalid = logout handled elsewhere */ });
 }
 async function logout() {
     try { await fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }); } catch(e){}
@@ -185,10 +197,10 @@ function showToast(message, type = 'success', duration = 4000) {
     };
     
     const bgColors = {
-        success: 'border-emerald-200 bg-gradient-to-r from-emerald-50 to-white',
-        error: 'border-red-200 bg-gradient-to-r from-red-50 to-white',
-        warning: 'border-amber-200 bg-gradient-to-r from-amber-50 to-white',
-        info: 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-white'
+        success: 'border-emerald-200 bg-emerald-50',
+        error: 'border-red-200 bg-red-50',
+        warning: 'border-amber-200 bg-amber-50',
+        info: 'border-indigo-200 bg-indigo-50'
     };
     
     toast.className = `flex items-center gap-3 px-5 py-4 rounded-xl shadow-lg border backdrop-blur-sm ${bgColors[type]} transform translate-x-full opacity-0 transition-all duration-300 max-w-sm`;

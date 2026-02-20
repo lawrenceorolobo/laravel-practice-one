@@ -24,7 +24,7 @@ class InvitationMail extends Mailable
     {
         $this->assessment = $assessment;
         $this->invitee = $invitee;
-        $this->testUrl = url('/test/' . $invitee->access_token);
+        $this->testUrl = url('/test/' . $invitee->invite_token);
         $this->calendarLinks = $this->generateCalendarLinks();
     }
 

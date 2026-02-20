@@ -37,8 +37,8 @@
     <select id="statusFilter" class="w-full sm:w-auto px-3 lg:px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
         <option value="">All Status</option>
         <option value="draft">Draft</option>
-        <option value="published">Published</option>
-        <option value="closed">Closed</option>
+        <option value="active">Active</option>
+        <option value="completed">Completed</option>
     </select>
 </div>
 
@@ -99,6 +99,23 @@
         </table>
     </div>
 </div>
+
+<!-- Assessment Detail Modal -->
+<div id="assessmentModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4" onclick="if(event.target === this) closeAssessmentModal()">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-4 lg:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800">
+            <h3 class="text-base lg:text-lg font-bold" id="assessmentModalTitle">Assessment Details</h3>
+            <button onclick="closeAssessmentModal()" class="text-slate-400 hover:text-white p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="p-4 lg:p-6 space-y-4" id="assessmentModalBody">
+            <!-- Content populated by JS -->
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -124,15 +141,12 @@
 
     function updateStats() {
         const total = allAssessments.length;
-        const active = allAssessments.filter(a => a.status === 'published').length;
-        const completed = allAssessments.filter(a => a.status === 'closed').length;
+        const active = allAssessments.filter(a => a.status === 'active').length;
+        const completed = allAssessments.reduce((sum, a) => sum + (a.completed_count || 0), 0);
         
-        // Calculate avg score from completed invitees
-        let avgScore = 0;
-        const allScores = allAssessments.flatMap(a => a.scores || []);
-        if (allScores.length > 0) {
-            avgScore = Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
-        }
+        // Calculate avg score from API avg_score values
+        const scored = allAssessments.filter(a => a.avg_score != null);
+        const avgScore = scored.length > 0 ? Math.round(scored.reduce((sum, a) => sum + parseFloat(a.avg_score), 0) / scored.length) : 0;
 
         document.getElementById('stat-total').innerHTML = `
             <p class="text-xs lg:text-sm text-slate-400 mb-1">Total Assessments</p>
@@ -184,8 +198,8 @@
                 <td class="px-4 lg:px-6 py-3 lg:py-4 text-sm hidden sm:table-cell">${a.completed_count || 0}</td>
                 <td class="px-4 lg:px-6 py-3 lg:py-4">
                     <span class="px-2 py-1 rounded-full text-xs font-medium ${
-                        a.status === 'published' ? 'bg-emerald-600/20 text-emerald-400' :
-                        a.status === 'closed' ? 'bg-slate-600/20 text-slate-400' :
+                        a.status === 'active' ? 'bg-emerald-600/20 text-emerald-400' :
+                        a.status === 'completed' ? 'bg-slate-600/20 text-slate-400' :
                         'bg-amber-600/20 text-amber-400'
                     }">
                         ${a.status || 'draft'}
@@ -211,8 +225,128 @@
         `).join('');
     }
 
-    function viewAssessment(id) {
-        window.location.href = `/admin/assessments/${id}`;
+    async function viewAssessment(id) {
+        const modal = document.getElementById('assessmentModal');
+        const body = document.getElementById('assessmentModalBody');
+        document.getElementById('assessmentModalTitle').textContent = 'Loading...';
+        body.innerHTML = '<div class="text-center py-8"><div class="animate-spin w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full mx-auto"></div></div>';
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        try {
+            const res = await fetch(`/api/admin/assessments/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+            });
+            const a = await res.json();
+            document.getElementById('assessmentModalTitle').textContent = a.title;
+
+            // Overview section
+            let html = `<div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-slate-400">Status</span>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                        a.status === 'active' ? 'bg-emerald-600/20 text-emerald-400' :
+                        a.status === 'completed' ? 'bg-slate-600/20 text-slate-400' :
+                        'bg-amber-600/20 text-amber-400'
+                    }">${a.status || 'draft'}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm text-slate-400">Created By</span>
+                    <span class="text-sm">${a.user?.first_name || 'Unknown'} ${a.user?.last_name || ''}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm text-slate-400">Questions / Invitees / Completed</span>
+                    <span class="text-sm">${a.questions?.length || 0} / ${a.invitees_count || 0} / ${a.completed_count || 0}</span>
+                </div>
+                ${a.avg_score != null ? `<div class="flex justify-between">
+                    <span class="text-sm text-slate-400">Avg. Score</span>
+                    <span class="text-sm font-medium text-emerald-400">${parseFloat(a.avg_score).toFixed(1)}%</span>
+                </div>` : ''}
+            </div>`;
+
+            // Questions section
+            if (a.questions && a.questions.length > 0) {
+                html += `<div class="mt-4"><h4 class="text-sm font-semibold text-slate-300 mb-2">Questions</h4>`;
+                a.questions.forEach((q, qi) => {
+                    html += `<div class="bg-slate-700/50 rounded-lg p-3 mb-2">
+                        <p class="text-sm font-medium mb-2">${qi + 1}. ${q.question_text}</p>`;
+
+                    if (q.options && q.options.length > 0) {
+                        html += `<div class="space-y-1">`;
+                        q.options.forEach(opt => {
+                            const isCorrect = opt.is_correct;
+                            html += `<div class="flex items-center gap-2 text-xs px-2 py-1 rounded ${isCorrect ? 'bg-emerald-600/20 text-emerald-300' : 'text-slate-400'}">
+                                <span class="font-medium">${opt.option_label}.</span>
+                                <span>${opt.option_text}</span>
+                                ${isCorrect ? '<span class="ml-auto text-emerald-400">✓</span>' : ''}
+                            </div>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    if (q.expected_answer) {
+                        html += `<p class="text-xs text-emerald-400 mt-1">Expected: ${q.expected_answer}</p>`;
+                    }
+
+                    html += `<p class="text-xs text-slate-500 mt-1">${q.points} point${q.points !== 1 ? 's' : ''} · ${q.question_type}</p>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+
+            // Candidates section
+            const completedInvitees = (a.invitees || []).filter(inv => inv.test_session);
+            if (completedInvitees.length > 0) {
+                html += `<div class="mt-4"><h4 class="text-sm font-semibold text-slate-300 mb-2">Candidates (${completedInvitees.length})</h4>`;
+                completedInvitees.forEach(inv => {
+                    const ts = inv.test_session;
+                    const name = [inv.first_name, inv.last_name].filter(Boolean).join(' ') || inv.email;
+                    const pct = ts.percentage != null ? parseFloat(ts.percentage).toFixed(1) : '—';
+                    const time = ts.time_spent_seconds ? `${Math.floor(ts.time_spent_seconds / 60)}m ${ts.time_spent_seconds % 60}s` : '—';
+
+                    html += `<div class="bg-slate-700/50 rounded-lg p-3 mb-2">
+                        <div class="flex justify-between items-center mb-2">
+                            <div>
+                                <p class="text-sm font-medium">${name}</p>
+                                <p class="text-xs text-slate-400">${inv.email}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold ${ts.passed ? 'text-emerald-400' : 'text-red-400'}">${pct}%</p>
+                                <p class="text-xs text-slate-500">${ts.total_score}/${ts.max_score} · ${time}</p>
+                            </div>
+                        </div>`;
+
+                    // Show individual answers
+                    if (ts.answers && ts.answers.length > 0) {
+                        html += `<div class="border-t border-slate-600 pt-2 mt-2 space-y-1">`;
+                        ts.answers.forEach(ans => {
+                            const q = (a.questions || []).find(q => q.id === ans.question_id);
+                            const qText = q ? q.question_text.substring(0, 60) + (q.question_text.length > 60 ? '...' : '') : 'Q';
+                            const selected = Array.isArray(ans.selected_options) ? ans.selected_options.join(', ') : (ans.text_answer || '—');
+                            html += `<div class="flex items-center gap-2 text-xs">
+                                <span class="${ans.is_correct ? 'text-emerald-400' : 'text-red-400'}">${ans.is_correct ? '✓' : '✗'}</span>
+                                <span class="text-slate-400 truncate flex-1">${qText}</span>
+                                <span class="text-slate-300">${selected}</span>
+                            </div>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            }
+
+            body.innerHTML = html;
+        } catch (err) {
+            console.error('Failed to load assessment details:', err);
+            body.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Failed to load assessment details</p>';
+        }
+    }
+
+    function closeAssessmentModal() {
+        document.getElementById('assessmentModal').classList.add('hidden');
+        document.getElementById('assessmentModal').classList.remove('flex');
     }
 
     async function deleteAssessment(id) {

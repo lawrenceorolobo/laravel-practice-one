@@ -41,4 +41,11 @@ return [
         'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
     ],
 
+    'flutterwave' => [
+        'public_key' => env('FLW_PUBLIC_KEY'),
+        'secret_key' => env('FLW_SECRET_KEY'),
+        'encryption_key' => env('FLW_ENCRYPTION_KEY'),
+        'webhook_secret' => env('FLW_WEBHOOK_SECRET'),
+    ],
+
 ];

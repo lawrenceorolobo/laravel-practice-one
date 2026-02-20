@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendEmailJob;
 use App\Models\Payment;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
@@ -49,8 +50,19 @@ class SubscriptionController extends Controller
             ->latest()
             ->first();
 
+        $planName = null;
+        if ($latestPayment) {
+            $meta = $latestPayment->metadata;
+            $planName = $meta['plan_name'] ?? null;
+            if (!$planName && $latestPayment->plan_id) {
+                $plan = SubscriptionPlan::find($latestPayment->plan_id);
+                $planName = $plan?->name;
+            }
+        }
+
         return response()->json([
             'subscription_status' => $user->subscription_status,
+            'plan_name' => $planName ?? ($user->subscription_status === 'active' ? 'Premium' : 'Free'),
             'expires_at' => $user->subscription_expires_at,
             'has_active' => $user->hasActiveSubscription(),
             'latest_payment' => $latestPayment ? [
@@ -107,6 +119,7 @@ class SubscriptionController extends Controller
 
             // Initialize Paystack transaction
             $response = Http::withToken(config('services.paystack.secret_key'))
+                ->timeout(10)
                 ->post("{$this->paystackUrl}/transaction/initialize", [
                     'email' => $user->email,
                     'amount' => (int) ($amount * 100), // Paystack uses kobo
@@ -245,7 +258,12 @@ class SubscriptionController extends Controller
             ]);
         });
 
-        // TODO: Send confirmation email
+        // Dispatch to queue — truly non-blocking
+        SendEmailJob::dispatch(
+            $payment->user->email,
+            new \App\Mail\SubscriptionConfirmationMail($payment)
+        );
+
         logger()->info('Subscription activated', [
             'user_id' => $payment->user_id,
             'payment_id' => $payment->id,

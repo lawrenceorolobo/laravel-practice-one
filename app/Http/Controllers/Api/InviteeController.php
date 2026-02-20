@@ -22,7 +22,7 @@ class InviteeController extends Controller
         $assessment = $this->getOwnedAssessment($request, $assessmentId);
 
         $invitees = $assessment->invitees()
-            ->with('testSession:id,invitee_id,status,percentage,passed')
+            ->with('testSession:id,invitee_id,status,percentage,passed,total_score,max_score,tab_switches,fullscreen_exits,time_spent_seconds,submitted_at')
             ->orderBy('created_at', 'desc')
             ->paginate(50);
 
@@ -45,49 +45,93 @@ class InviteeController extends Controller
         $validated = $request->validate([
             'emails' => ['required_without:csv', 'array', 'max:1000'],
             'emails.*' => ['email', 'max:255'],
+            'first_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['nullable', 'string', 'max:100'],
             'csv' => ['required_without:emails', 'file', 'mimes:csv,txt', 'max:5120'],
         ]);
 
-        $emails = [];
+        // Build rows: [{email, first_name, last_name}, ...]
+        $rows = [];
 
         if (isset($validated['emails'])) {
-            $emails = array_unique(array_map('strtolower', $validated['emails']));
+            $seen = [];
+            foreach ($validated['emails'] as $email) {
+                $email = strtolower(trim($email));
+                if (!isset($seen[$email])) {
+                    $seen[$email] = true;
+                    $rows[] = [
+                        'email' => $email,
+                        'first_name' => $validated['first_name'] ?? null,
+                        'last_name' => $validated['last_name'] ?? null,
+                    ];
+                }
+            }
         } elseif ($request->hasFile('csv')) {
-            $emails = $this->parseCSV($request->file('csv'));
+            $rows = $this->parseCSV($request->file('csv'));
         }
 
-        // Validate email count
-        if (count($emails) > 1000) {
+        if (count($rows) > 1000) {
             throw ValidationException::withMessages([
-                'emails' => ['Maximum 1000 emails per batch.'],
+                'emails' => ['Maximum 1000 invitees per batch.'],
             ]);
         }
 
         // Filter out already existing emails
+        $emailList = array_map(fn ($r) => $r['email'], $rows);
         $existingEmails = $assessment->invitees()
-            ->whereIn(DB::raw('LOWER(email)'), $emails)
+            ->whereIn(DB::raw('LOWER(email)'), $emailList)
             ->pluck('email')
             ->map(fn ($e) => strtolower($e))
             ->toArray();
 
-        $newEmails = array_diff($emails, $existingEmails);
+        $newRows = array_filter($rows, fn ($r) => !in_array($r['email'], $existingEmails));
 
         $created = 0;
         $skipped = count($existingEmails);
+        $createdInvitees = [];
 
-        DB::transaction(function () use ($assessment, $newEmails, &$created) {
-            foreach ($newEmails as $email) {
-                Invitee::create([
+        DB::transaction(function () use ($assessment, $newRows, &$created, &$createdInvitees) {
+            foreach ($newRows as $row) {
+                $invitee = Invitee::create([
                     'assessment_id' => $assessment->id,
-                    'email' => $email,
+                    'email' => $row['email'],
+                    'first_name' => $row['first_name'],
+                    'last_name' => $row['last_name'],
                     'invite_token' => Str::random(64),
                     'status' => 'pending',
                 ]);
+                $createdInvitees[] = $invitee;
                 $created++;
             }
 
             $assessment->update(['total_invites' => $assessment->invitees()->count()]);
         });
+
+        // Auto-send emails if assessment is already published
+        if (in_array($assessment->status, ['scheduled', 'active']) && count($createdInvitees) > 0) {
+            foreach ($createdInvitees as $invitee) {
+                $invitee->update(['email_status' => 'queued']);
+                dispatch(function () use ($assessment, $invitee) {
+                    try {
+                        Mail::to($invitee->email)->send(new \App\Mail\InvitationMail($assessment, $invitee));
+                        $invitee->update(['email_status' => 'sent', 'email_sent_at' => now()]);
+                    } catch (\Exception $e) {
+                        $invitee->update(['email_status' => 'failed']);
+                        \Log::warning("Auto-send failed for {$invitee->email}: " . $e->getMessage());
+                    }
+                });
+            }
+        }
+        // Return error if ALL were duplicates
+        if ($created === 0 && $skipped > 0) {
+            return response()->json([
+                'message' => $skipped === 1
+                    ? 'This email is already invited.'
+                    : "All {$skipped} email(s) are already invited.",
+                'created' => 0,
+                'skipped' => $skipped,
+            ], 409);
+        }
 
         return response()->json([
             'message' => 'Invitees added successfully.',
@@ -123,6 +167,94 @@ class InviteeController extends Controller
     }
 
     /**
+     * Update invitee details
+     */
+    public function update(Request $request, string $assessmentId, string $inviteeId): JsonResponse
+    {
+        $assessment = $this->getOwnedAssessment($request, $assessmentId);
+
+        $invitee = $assessment->invitees()
+            ->where('id', $inviteeId)
+            ->firstOrFail();
+
+        if ($invitee->hasStarted()) {
+            throw ValidationException::withMessages([
+                'invitee' => ['Cannot edit invitee who has already started the test.'],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'email' => ['sometimes', 'email', 'max:255'],
+            'first_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        // Check for duplicate email if changing
+        if (isset($validated['email'])) {
+            $email = strtolower(trim($validated['email']));
+            $exists = $assessment->invitees()
+                ->where('id', '!=', $invitee->id)
+                ->where(DB::raw('LOWER(email)'), $email)
+                ->exists();
+
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'email' => ['This email is already invited to this assessment.'],
+                ]);
+            }
+            $validated['email'] = $email;
+        }
+
+        $invitee->update($validated);
+
+        return response()->json([
+            'message' => 'Invitee updated successfully.',
+            'invitee' => $invitee->fresh(),
+        ]);
+    }
+
+    /**
+     * Resend invitation email to a single invitee (async — returns instantly)
+     */
+    public function resend(Request $request, string $assessmentId, string $inviteeId): JsonResponse
+    {
+        $assessment = $this->getOwnedAssessment($request, $assessmentId);
+
+        if (!in_array($assessment->status, ['scheduled', 'active'])) {
+            throw ValidationException::withMessages([
+                'assessment' => ['Assessment must be published before sending invites.'],
+            ]);
+        }
+
+        $invitee = $assessment->invitees()
+            ->where('id', $inviteeId)
+            ->firstOrFail();
+
+        if ($invitee->hasCompleted()) {
+            throw ValidationException::withMessages([
+                'invitee' => ['Cannot resend to invitee who has completed the test.'],
+            ]);
+        }
+
+        $invitee->update(['email_status' => 'queued']);
+
+        // Dispatch to queue — returns immediately
+        dispatch(function () use ($assessment, $invitee) {
+            try {
+                Mail::to($invitee->email)->send(new \App\Mail\InvitationMail($assessment, $invitee));
+                $invitee->update(['email_status' => 'sent', 'email_sent_at' => now()]);
+            } catch (\Exception $e) {
+                $invitee->update(['email_status' => 'failed']);
+                \Log::warning("Resend failed for {$invitee->email}: " . $e->getMessage());
+            }
+        });
+
+        return response()->json([
+            'message' => 'Invitation sent for ' . $invitee->email,
+        ]);
+    }
+
+    /**
      * Send email invitations
      */
     public function sendInvites(Request $request, string $assessmentId): JsonResponse
@@ -140,8 +272,8 @@ class InviteeController extends Controller
             'invitee_ids.*' => ['uuid', 'exists:invitees,id'],
         ]);
 
-        // Get invitees to send to
-        $query = $assessment->invitees()->where('status', 'pending');
+        // Get invitees who haven't started/completed the test
+        $query = $assessment->invitees()->whereNotIn('status', ['completed']);
         
         if (!empty($validated['invitee_ids'])) {
             $query->whereIn('id', $validated['invitee_ids']);
@@ -174,7 +306,7 @@ class InviteeController extends Controller
         }
 
         return response()->json([
-            'message' => 'Invitations queued for sending.',
+            'message' => 'Invitations sent.',
             'sent' => $totalSent,
             'batches' => $batches->count(),
         ]);
@@ -183,21 +315,7 @@ class InviteeController extends Controller
     protected function sendInviteEmail(Invitee $invitee, Assessment $assessment): void
     {
         try {
-            // This would use a Mailable class in production
-            $link = config('app.url') . '/test/' . $invitee->invite_token;
-            
-            Mail::raw(
-                "You have been invited to take the assessment: {$assessment->title}\n\n" .
-                "Click here to start: {$link}\n\n" .
-                "This assessment is available from {$assessment->start_datetime->format('M j, Y g:i A')} " .
-                "to {$assessment->end_datetime->format('M j, Y g:i A')}.\n\n" .
-                "Duration: {$assessment->duration_minutes} minutes",
-                function ($message) use ($invitee, $assessment) {
-                    $message->to($invitee->email)
-                        ->subject("You're invited: {$assessment->title}");
-                }
-            );
-
+            Mail::to($invitee->email)->send(new \App\Mail\InvitationMail($assessment, $invitee));
             $invitee->markAsSent();
         } catch (\Exception $e) {
             logger()->error('Failed to send invite email', [
@@ -207,27 +325,52 @@ class InviteeController extends Controller
         }
     }
 
+    /**
+     * Parse CSV file into invitee rows with email, first_name, last_name.
+     * Supports: email-only, email+first_name, or email+first_name+last_name columns.
+     * Auto-detects header row.
+     */
     protected function parseCSV($file): array
     {
-        $emails = [];
+        $rows = [];
         $handle = fopen($file->getRealPath(), 'r');
-        
+        $seen = [];
         $rowCount = 0;
+        $headerSkipped = false;
+
         while (($row = fgetcsv($handle)) !== false) {
             if ($rowCount++ > 10000) {
-                break; // Safety limit
+                break;
             }
 
-            foreach ($row as $cell) {
-                $email = strtolower(trim($cell));
-                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $emails[] = $email;
+            // Skip header row if first cell looks like a header
+            if (!$headerSkipped) {
+                $headerSkipped = true;
+                $firstCell = strtolower(trim($row[0] ?? ''));
+                if (in_array($firstCell, ['email', 'email_address', 'e-mail', 'mail'])) {
+                    continue;
                 }
             }
+
+            $email = strtolower(trim($row[0] ?? ''));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            if (isset($seen[$email])) {
+                continue;
+            }
+            $seen[$email] = true;
+
+            $rows[] = [
+                'email' => $email,
+                'first_name' => trim($row[1] ?? '') ?: null,
+                'last_name' => trim($row[2] ?? '') ?: null,
+            ];
         }
-        
+
         fclose($handle);
-        return array_unique($emails);
+        return $rows;
     }
 
     protected function getOwnedAssessment(Request $request, string $assessmentId): Assessment

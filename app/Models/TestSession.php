@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicUid;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,9 +10,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TestSession extends Model
 {
-    use HasUuids;
+    use HasUuids, HasPublicUid;
+
+    protected string $uidPrefix = 'tss';
+    protected string $uidColumn = 'public_id';
 
     protected $fillable = [
+        'public_id',
         'invitee_id',
         'assessment_id',
         'first_name',
@@ -113,9 +118,12 @@ class TestSession extends Model
             'max_score' => $maxScore,
             'percentage' => round($percentage, 2),
             'passed' => $passed,
-            'time_spent_seconds' => now()->diffInSeconds($this->started_at),
+            'time_spent_seconds' => abs(now()->diffInSeconds($this->started_at)),
             'submitted_at' => now(),
             'status' => 'submitted',
         ]);
+
+        // Sync invitee status to 'completed'
+        $this->invitee?->update(['status' => 'completed']);
     }
 }

@@ -99,7 +99,7 @@
                     <p class="text-sm text-slate-400">Require 2FA for admin accounts</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" class="sr-only peer">
+                    <input type="checkbox" id="toggle2fa" class="sr-only peer" onchange="saveSecurity()">
                     <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
             </div>
@@ -109,7 +109,7 @@
                     <p class="text-sm text-slate-400">Users must verify email before accessing platform</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked class="sr-only peer">
+                    <input type="checkbox" id="toggleEmailVerify" checked class="sr-only peer" onchange="saveSecurity()">
                     <div class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
             </div>
@@ -118,7 +118,7 @@
                     <p class="font-medium">Rate Limiting</p>
                     <p class="text-sm text-slate-400">Limit API requests per minute</p>
                 </div>
-                <input type="number" value="60" min="1" class="w-20 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="number" id="rateLimitInput" value="60" min="1" class="w-20 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="saveSecurity()">
             </div>
         </div>
     </div>
@@ -129,19 +129,92 @@
 <script>
     const token = localStorage.getItem('adminToken');
 
+    // Load settings from backend
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/admin/settings', {
+                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+            });
+            if (res.status === 401) {
+                localStorage.removeItem('adminToken');
+                window.location.href = '/admin/login';
+                return;
+            }
+            const data = await res.json();
+            const s = data.settings || {};
+            
+            // Populate General
+            if (s.platform_name) document.getElementById('platformName').value = s.platform_name;
+            
+            // Populate Security
+            if (s.require_2fa !== undefined) document.getElementById('toggle2fa').checked = !!s.require_2fa;
+            if (s.require_email_verification !== undefined) document.getElementById('toggleEmailVerify').checked = !!s.require_email_verification;
+            if (s.rate_limit_api) document.getElementById('rateLimitInput').value = s.rate_limit_api;
+        } catch (err) {
+            console.error('Failed to load settings:', err);
+        }
+    }
+
+    // Save general settings  
     document.getElementById('generalForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        toastSuccess('Settings saved successfully!');
+        try {
+            const res = await fetch('/api/admin/settings', {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ settings: [
+                    { key: 'platform_name', value: document.getElementById('platformName').value, type: 'string' },
+                    { key: 'platform_description', value: document.getElementById('platformDescription').value, type: 'string' },
+                    { key: 'support_email', value: document.getElementById('supportEmail').value, type: 'string' },
+                ]})
+            });
+            if (res.ok) toastSuccess('Settings saved successfully!');
+            else toastError('Failed to save settings');
+        } catch (err) {
+            toastError('Failed to save settings');
+        }
     });
 
+    // Save email settings
     document.getElementById('emailForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        toastSuccess('Email settings updated!');
+        toastInfo('Email settings are configured via environment variables (.env) for security.');
     });
 
+    // Save payment settings
     document.getElementById('paymentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        toastSuccess('Payment settings updated!');
+        toastInfo('Payment keys are configured via environment variables (.env) for security.');
     });
+
+    // Save security settings
+    async function saveSecurity() {
+        try {
+            const res = await fetch('/api/admin/settings', {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ settings: [
+                    { key: 'require_2fa', value: document.getElementById('toggle2fa').checked ? '1' : '0', type: 'bool' },
+                    { key: 'require_email_verification', value: document.getElementById('toggleEmailVerify').checked ? '1' : '0', type: 'bool' },
+                    { key: 'rate_limit_api', value: document.getElementById('rateLimitInput').value, type: 'int' },
+                ]})
+            });
+            if (res.ok) toastSuccess('Security settings updated');
+            else toastError('Failed to update security settings');
+        } catch (err) {
+            toastError('Failed to save security settings');
+        }
+    }
+
+    loadSettings();
 </script>
 @endsection
+

@@ -9,7 +9,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 flex items-center justify-center p-6">
+<body class="min-h-screen bg-slate-900 flex items-center justify-center p-6">
 
     <div class="w-full max-w-md">
         <!-- Back Button -->
@@ -22,7 +22,7 @@
 
         <!-- Logo -->
         <div class="text-center mb-8">
-            <a href="{{ url('/') }}" class="text-4xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <a href="{{ url('/') }}" class="text-4xl font-black text-indigo-400">
                 Quizly.
             </a>
         </div>
@@ -45,7 +45,7 @@
                 </div>
 
                 <button type="submit" id="submitBtn"
-                    class="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50">
+                    class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50">
                     <span id="btnText">Send Reset Link</span>
                     <svg id="btnSpinner" class="hidden w-5 h-5 mx-auto animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -88,7 +88,7 @@
                 successDiv.textContent = result.message || 'If an account exists, you will receive an email.';
                 successDiv.classList.remove('hidden');
             } catch (err) {
-                errorDiv.textContent = 'Something went wrong. Please try again.';
+                errorDiv.textContent = 'Something went wrong. Give it another try.';
                 errorDiv.classList.remove('hidden');
             } finally {
                 submitBtn.disabled = false;

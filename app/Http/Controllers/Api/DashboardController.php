@@ -32,7 +32,7 @@ class DashboardController extends Controller
         
         // Get completed sessions count
         $totalCompleted = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
             ->count();
         
         // Calculate completion rate
@@ -42,9 +42,9 @@ class DashboardController extends Controller
         
         // Calculate average score
         $avgScore = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
-            ->whereNotNull('score')
-            ->avg('score');
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
+            ->whereNotNull('percentage')
+            ->avg('percentage');
         
         $avgScore = $avgScore ? round($avgScore) : 0;
         
@@ -64,7 +64,7 @@ class DashboardController extends Controller
         $twoMonthsAgo = Carbon::now()->subDays(60);
         
         $lastMonthCompleted = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
             ->where('created_at', '>=', $monthAgo)
             ->count();
         
@@ -73,7 +73,7 @@ class DashboardController extends Controller
             ->count();
         
         $prevMonthCompleted = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
             ->whereBetween('created_at', [$twoMonthsAgo, $monthAgo])
             ->count();
         
@@ -110,7 +110,7 @@ class DashboardController extends Controller
         
         // Recent test completions
         $recentSessions = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
             ->with(['invitee', 'assessment'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
@@ -123,7 +123,7 @@ class DashboardController extends Controller
                 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
                 'message' => ($session->invitee?->first_name ?? 'A candidate') . 
                     ' completed "' . ($session->assessment?->title ?? 'an assessment') . 
-                    '" with ' . ($session->score ?? 0) . '% score',
+                    '" with ' . round($session->percentage ?? 0) . '% score',
                 'time_ago' => $session->created_at->diffForHumans(),
             ];
         }
@@ -174,12 +174,12 @@ class DashboardController extends Controller
         ];
         
         $sessions = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
-            ->whereNotNull('score_percentage')
-            ->get(['score_percentage']);
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
+            ->whereNotNull('percentage')
+            ->get(['percentage']);
         
         foreach ($sessions as $session) {
-            $score = $session->score_percentage;
+            $score = $session->percentage;
             if ($score <= 20) $scoreDistribution['0-20']++;
             elseif ($score <= 40) $scoreDistribution['21-40']++;
             elseif ($score <= 60) $scoreDistribution['41-60']++;
@@ -193,7 +193,7 @@ class DashboardController extends Controller
             $date = Carbon::now()->subDays($i);
             $dayName = $date->format('D');
             $count = TestSession::whereIn('assessment_id', $assessmentIds)
-                ->where('status', 'completed')
+                ->whereIn('status', ['submitted', 'completed', 'timed_out'])
                 ->whereDate('created_at', $date->toDateString())
                 ->count();
             $testsOverTime[] = ['day' => $dayName, 'count' => $count];
@@ -201,22 +201,22 @@ class DashboardController extends Controller
         
         // Calculate totals
         $totalTests = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
             ->count();
             
         $avgScore = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
-            ->whereNotNull('score_percentage')
-            ->avg('score_percentage');
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
+            ->whereNotNull('percentage')
+            ->avg('percentage');
             
         $avgTime = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
-            ->whereNotNull('time_taken')
-            ->avg('time_taken');
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
+            ->whereNotNull('time_spent_seconds')
+            ->avg('time_spent_seconds');
         
         $passCount = TestSession::whereIn('assessment_id', $assessmentIds)
-            ->where('status', 'completed')
-            ->where('score_percentage', '>=', 50)
+            ->whereIn('status', ['submitted', 'completed', 'timed_out'])
+            ->where('percentage', '>=', 50)
             ->count();
         
         $passRate = $totalTests > 0 ? round(($passCount / $totalTests) * 100) : 0;

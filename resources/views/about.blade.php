@@ -5,7 +5,7 @@
 @section('content')
 
 <!-- Hero Section -->
-<section class="relative pt-32 pb-20 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 overflow-hidden">
+<section class="relative pt-32 pb-20 bg-slate-900 overflow-hidden">
     <!-- Background Effects -->
     <div class="absolute inset-0">
         <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl"></div>
@@ -16,7 +16,7 @@
         <span class="inline-block text-indigo-400 font-semibold text-sm uppercase tracking-widest mb-4">About Us</span>
         <h1 class="text-4xl md:text-6xl lg:text-7xl font-black text-white mb-6">
             We're building the<br />
-            <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">future of hiring</span>
+            <span class="text-indigo-400 bg-clip-text text-transparent">future of hiring</span>
         </h1>
         <p class="text-xl text-indigo-200/70 max-w-2xl mx-auto">
             Quizly was founded to solve a simple problem: making assessments that are fair, fraud-proof, and actually useful.
@@ -29,19 +29,19 @@
     <div class="max-w-7xl mx-auto px-6">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div class="text-center reveal-on-scroll">
-                <div class="text-5xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">500+</div>
+                <div class="text-5xl font-black bg-indigo-600 bg-clip-text text-transparent mb-2">500+</div>
                 <div class="text-slate-500 font-medium">Companies Trust Us</div>
             </div>
             <div class="text-center reveal-on-scroll" style="animation-delay: 100ms">
-                <div class="text-5xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">1M+</div>
+                <div class="text-5xl font-black bg-purple-600 bg-clip-text text-transparent mb-2">1M+</div>
                 <div class="text-slate-500 font-medium">Tests Completed</div>
             </div>
             <div class="text-center reveal-on-scroll" style="animation-delay: 200ms">
-                <div class="text-5xl font-black bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-2">99.9%</div>
+                <div class="text-5xl font-black bg-pink-600 bg-clip-text text-transparent mb-2">99.9%</div>
                 <div class="text-slate-500 font-medium">Uptime SLA</div>
             </div>
             <div class="text-center reveal-on-scroll" style="animation-delay: 300ms">
-                <div class="text-5xl font-black bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">24/7</div>
+                <div class="text-5xl font-black bg-emerald-600 bg-clip-text text-transparent mb-2">24/7</div>
                 <div class="text-slate-500 font-medium">Support Available</div>
             </div>
         </div>
@@ -66,7 +66,7 @@
             </div>
             <div class="reveal-on-scroll" style="animation-delay: 200ms">
                 <div class="relative">
-                    <div class="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-3xl rotate-3"></div>
+                    <div class="absolute inset-0 bg-indigo-600 rounded-3xl rotate-3"></div>
                     <div class="relative bg-white rounded-3xl p-10 shadow-xl">
                         <div class="space-y-6">
                             <div class="flex items-start gap-4">
@@ -123,13 +123,13 @@
         <div class="grid md:grid-cols-3 gap-8">
             <!-- Team Member 1 -->
             <div class="group reveal-on-scroll">
-                <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-100 to-purple-100 aspect-square mb-6">
+                <div class="relative overflow-hidden rounded-3xl bg-indigo-100 aspect-square mb-6">
                     <div class="absolute inset-0 flex items-center justify-center">
-                        <div class="w-32 h-32 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
+                        <div class="w-32 h-32 bg-indigo-600 rounded-full flex items-center justify-center">
                             <span class="text-5xl font-black text-white">L</span>
                         </div>
                     </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                    <div class="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
                         <div class="flex gap-3">
                             <a href="#" class="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
@@ -147,13 +147,13 @@
             
             <!-- Team Member 2 -->
             <div class="group reveal-on-scroll" style="animation-delay: 100ms">
-                <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-100 to-pink-100 aspect-square mb-6">
+                <div class="relative overflow-hidden rounded-3xl bg-purple-100 aspect-square mb-6">
                     <div class="absolute inset-0 flex items-center justify-center">
-                        <div class="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <div class="w-32 h-32 bg-purple-600 rounded-full flex items-center justify-center">
                             <span class="text-5xl font-black text-white">A</span>
                         </div>
                     </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                    <div class="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
                         <div class="flex gap-3">
                             <a href="#" class="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
@@ -171,13 +171,13 @@
             
             <!-- Team Member 3 -->
             <div class="group reveal-on-scroll" style="animation-delay: 200ms">
-                <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-pink-100 to-rose-100 aspect-square mb-6">
+                <div class="relative overflow-hidden rounded-3xl bg-pink-100 aspect-square mb-6">
                     <div class="absolute inset-0 flex items-center justify-center">
-                        <div class="w-32 h-32 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center">
+                        <div class="w-32 h-32 bg-pink-600 rounded-full flex items-center justify-center">
                             <span class="text-5xl font-black text-white">C</span>
                         </div>
                     </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                    <div class="absolute inset-0 bg-slate-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
                         <div class="flex gap-3">
                             <a href="#" class="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center transition-colors">
                                 <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
@@ -197,7 +197,7 @@
 </section>
 
 <!-- CTA Section -->
-<section class="py-20 bg-gradient-to-br from-indigo-600 to-purple-600 relative overflow-hidden">
+<section class="py-20 bg-indigo-600 relative overflow-hidden">
     <!-- Background Pattern -->
     <div class="absolute inset-0 opacity-30">
         <div class="absolute top-0 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>

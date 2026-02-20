@@ -22,7 +22,15 @@ class AssessmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $assessments = Assessment::where('user_id', $request->user()->id)
-            ->withCount(['questions', 'invitees', 'testSessions'])
+            ->withCount([
+                'questions',
+                'invitees',
+                'testSessions',
+                'invitees as completed_count' => fn($q) => $q->where('status', 'completed'),
+            ])
+            ->withAvg([
+                'testSessions as avg_score' => fn($q) => $q->whereIn('status', ['submitted', 'completed', 'timed_out']),
+            ], 'percentage')
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
@@ -70,7 +78,14 @@ class AssessmentController extends Controller
         $assessment = Assessment::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->with(['questions.options'])
-            ->withCount(['invitees', 'testSessions'])
+            ->withCount([
+                'invitees',
+                'testSessions',
+                'invitees as completed_count' => fn($q) => $q->where('status', 'completed'),
+            ])
+            ->withAvg([
+                'testSessions as avg_score' => fn($q) => $q->whereIn('status', ['submitted', 'completed', 'timed_out']),
+            ], 'percentage')
             ->firstOrFail();
 
         return response()->json($assessment);
@@ -144,7 +159,7 @@ class AssessmentController extends Controller
     {
         $assessment = Assessment::where('id', $id)
             ->where('user_id', $request->user()->id)
-            ->withCount('questions')
+            ->withCount(['questions', 'invitees'])
             ->firstOrFail();
 
         if ($assessment->status !== 'draft') {
@@ -155,38 +170,32 @@ class AssessmentController extends Controller
 
         if ($assessment->questions_count === 0) {
             throw ValidationException::withMessages([
-                'questions' => ['Assessment must have at least one question.'],
+                'questions' => ['Assessment must have at least one question before publishing.'],
             ]);
         }
 
-        // Update status based on timing
+        if ($assessment->invitees_count === 0) {
+            throw ValidationException::withMessages([
+                'invitees' => ['Assessment must have at least one candidate before publishing.'],
+            ]);
+        }
+
+        // Update status + generate public access code
         $status = now()->gte($assessment->start_datetime) ? 'active' : 'scheduled';
 
         $assessment->update([
             'status' => $status,
             'total_questions' => $assessment->questions_count,
+            'access_code' => $assessment->access_code ?? \Illuminate\Support\Str::random(24),
         ]);
 
-        // Send invitation emails to all invitees
-        $invitees = Invitee::where('assessment_id', $assessment->id)
-            ->where('status', 'pending')
-            ->get();
-        
-        $emailsSent = 0;
-        foreach ($invitees as $invitee) {
-            try {
-                Mail::to($invitee->email)->send(new InvitationMail($assessment, $invitee));
-                $invitee->update(['invite_sent_at' => now()]);
-                $emailsSent++;
-            } catch (\Exception $e) {
-                \Log::warning("Failed to send invitation to {$invitee->email}: " . $e->getMessage());
-            }
-        }
+        // Dispatch queued batch job (returns immediately)
+        \App\Jobs\SendInvitationBatchJob::dispatch($assessment->id);
 
         return response()->json([
-            'message' => "Assessment published successfully. {$emailsSent} invitation(s) sent.",
+            'message' => "Assessment published. {$assessment->invitees_count} invitation(s) queued for delivery.",
             'assessment' => $assessment->fresh(),
-            'invitations_sent' => $emailsSent,
+            'invitations_queued' => $assessment->invitees_count,
         ]);
     }
 

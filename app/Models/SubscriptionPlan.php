@@ -39,4 +39,9 @@ class SubscriptionPlan extends Model
     {
         return $this->hasMany(Payment::class, 'plan_id');
     }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'subscription_plan_id');
+    }
 }

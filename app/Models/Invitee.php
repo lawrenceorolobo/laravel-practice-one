@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicUid;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,15 +11,22 @@ use Illuminate\Support\Str;
 
 class Invitee extends Model
 {
-    use HasUuids;
+    use HasUuids, HasPublicUid;
+
+    protected string $uidPrefix = 'inv';
+    protected string $uidColumn = 'public_id';
 
     protected $fillable = [
+        'public_id',
         'assessment_id',
         'email',
+        'first_name',
+        'last_name',
         'invite_token',
         'email_sent_at',
         'email_opened_at',
         'status',
+        'email_status',
     ];
 
     protected function casts(): array
@@ -61,7 +69,7 @@ class Invitee extends Model
     public function markAsSent(): void
     {
         $this->update([
-            'status' => 'sent',
+            'email_status' => 'sent',
             'email_sent_at' => now(),
         ]);
     }

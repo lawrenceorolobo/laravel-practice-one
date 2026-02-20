@@ -16,7 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'subscription_paid' => \App\Http\Middleware\EnsureSubscriptionPaid::class,
+            'ensure_admin' => \App\Http\Middleware\EnsureAdmin::class,
+        ]);
+        
+        // Trust ngrok proxy for HTTPS
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Sanitize database errors - NEVER expose SQL to users

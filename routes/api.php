@@ -48,6 +48,10 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::post('/answer/{token}', [TestController::class, 'submitAnswer']);
         Route::post('/submit/{token}', [TestController::class, 'submit']);
         Route::post('/proctoring/{token}', [TestController::class, 'logProctoringEvent']);
+
+        // Public access link (anyone with code can join)
+        Route::get('/access/{accessCode}', [TestController::class, 'validateAccessCode']);
+        Route::post('/join/{accessCode}', [TestController::class, 'joinByAccessCode']);
     });
 
     // Subscription Plans (Public)
@@ -55,6 +59,9 @@ Route::middleware([SanitizeInput::class])->group(function () {
 
     // Paystack Webhook (No auth, signature verified in controller)
     Route::post('/webhooks/paystack', [SubscriptionController::class, 'webhook']);
+
+    // Flutterwave Webhook (No auth, signature verified in controller)
+    Route::post('/webhooks/flutterwave', [\App\Http\Controllers\Api\PaymentController::class, 'webhook']);
 
     /*
     |--------------------------------------------------------------------------
@@ -64,7 +71,9 @@ Route::middleware([SanitizeInput::class])->group(function () {
     Route::middleware(['auth:sanctum', RateLimitByTier::class . ':api'])->group(function () {
         // Auth
         Route::post('/auth/logout', [AuthController::class, 'logout']);
-        Route::get('/auth/me', [AuthController::class, 'me']);
+        Route::get('/auth/profile', [AuthController::class, 'me']);
+        Route::post('/auth/send-otp', [AuthController::class, 'sendOtp']);
+        Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
 
         // Dashboard Stats
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
@@ -76,6 +85,9 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::post('/subscription/initialize', [SubscriptionController::class, 'initialize'])
             ->middleware(IdempotencyMiddleware::class);
         Route::post('/subscription/verify', [SubscriptionController::class, 'verify']);
+
+        // Flutterwave Payments (requires auth, no subscription needed)
+        Route::post('/payments/initialize', [\App\Http\Controllers\Api\PaymentController::class, 'initialize']);
 
         /*
         |--------------------------------------------------------------------------
@@ -94,12 +106,15 @@ Route::middleware([SanitizeInput::class])->group(function () {
             Route::put('/assessments/{assessment}/questions/{question}', [QuestionController::class, 'update']);
             Route::delete('/assessments/{assessment}/questions/{question}', [QuestionController::class, 'destroy']);
             Route::post('/assessments/{assessment}/questions/reorder', [QuestionController::class, 'reorder']);
+            Route::post('/assessments/{assessment}/questions/import', [QuestionController::class, 'importCSV']);
 
             // Invitees
             Route::get('/assessments/{assessment}/invitees', [InviteeController::class, 'index']);
             Route::post('/assessments/{assessment}/invitees', [InviteeController::class, 'store']);
+            Route::put('/assessments/{assessment}/invitees/{invitee}', [InviteeController::class, 'update']);
             Route::delete('/assessments/{assessment}/invitees/{invitee}', [InviteeController::class, 'destroy']);
             Route::post('/assessments/{assessment}/invitees/send', [InviteeController::class, 'sendInvites']);
+            Route::post('/assessments/{assessment}/invitees/{invitee}/resend', [InviteeController::class, 'resend']);
         });
     });
 
@@ -108,7 +123,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
     | Super Admin Routes
     |--------------------------------------------------------------------------
     */
-    Route::prefix('admin')->middleware(['auth:sanctum'])->group(function () {
+    Route::prefix('admin')->middleware(['auth:sanctum', 'ensure_admin'])->group(function () {
         Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
         Route::get('/auth/me', [AdminAuthController::class, 'me']);
 
@@ -134,6 +149,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
 
         // Assessment Management
         Route::get('/assessments', [AdminController::class, 'assessments']);
+        Route::get('/assessments/{id}', [AdminController::class, 'showAssessment']);
         Route::delete('/assessments/{id}', [AdminController::class, 'deleteAssessment']);
     });
 });

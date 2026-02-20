@@ -54,8 +54,8 @@
                     <strong>Important:</strong> This test will monitor tab switching and fullscreen exits. Do not switch tabs or exit fullscreen during the assessment.
                 </div>
 
-                <button type="submit"
-                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition">
+                <button type="submit" id="startBtn" disabled
+                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Start Assessment
                 </button>
             </form>
@@ -180,6 +180,7 @@
 <script>
 const TOKEN = '{{ $token ?? "" }}';
 let sessionId = null;
+let assessmentData = null;
 let questions = [];
 let currentIndex = 0;
 let answers = {};
@@ -282,36 +283,51 @@ async function validateToken() {
         
         if (data.resume) {
             sessionId = data.session_id;
-            timeRemaining = data.time_remaining;
+            timeRemaining = Math.floor(data.time_remaining);
+            assessmentData = data.assessment;
             showQuiz(data.assessment);
             loadQuestions();
         } else {
-            showRegistration(data.assessment);
+            assessmentData = data.assessment;
+            showRegistration(data.assessment, data);
         }
     } catch (err) {
         showError('Network error. Please refresh.');
     }
 }
 
-function showRegistration(assessment) {
+function showRegistration(assessment, data) {
     hideAll();
     document.getElementById('registrationState').classList.remove('hidden');
     document.getElementById('assessmentTitle').textContent = assessment.title;
     document.getElementById('assessmentDesc').textContent = assessment.description || 'Please enter your details to begin.';
     document.getElementById('duration').textContent = assessment.duration_minutes + ' minutes';
+
+    // Prefill name if invitee has name data — make readonly
+    const fnInput = document.getElementById('firstName');
+    const lnInput = document.getElementById('lastName');
+    if (data?.first_name) {
+        fnInput.value = data.first_name;
+        fnInput.readOnly = true;
+        fnInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+    }
+    if (data?.last_name) {
+        lnInput.value = data.last_name;
+        lnInput.readOnly = true;
+        lnInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+    }
+    checkStartForm();
 }
 
 function showQuiz(assessment) {
     hideAll();
     document.getElementById('quizState').classList.remove('hidden');
-    document.getElementById('quizTitle').textContent = assessment?.title || 'Assessment';
+    document.getElementById('quizTitle').textContent = assessment?.title || assessmentData?.title || 'Assessment';
     
     // Request fullscreen
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(() => {});
     }
-    
-    startTimer();
 }
 
 function showError(message) {
@@ -327,6 +343,15 @@ function hideAll() {
     document.getElementById('completedState').classList.add('hidden');
     document.getElementById('errorState').classList.add('hidden');
 }
+
+// Progressive form validation — enable Start button only when both names filled
+function checkStartForm() {
+    const fn = document.getElementById('firstName').value.trim();
+    const ln = document.getElementById('lastName').value.trim();
+    document.getElementById('startBtn').disabled = !(fn && ln);
+}
+document.getElementById('firstName').addEventListener('input', checkStartForm);
+document.getElementById('lastName').addEventListener('input', checkStartForm);
 
 // Start form
 document.getElementById('startForm')?.addEventListener('submit', async (e) => {
@@ -355,7 +380,7 @@ document.getElementById('startForm')?.addEventListener('submit', async (e) => {
         
         sessionId = data.session_id;
         await loadQuestions();
-        showQuiz();
+        showQuiz(assessmentData);
     } catch (err) {
         errorDiv.textContent = 'Network error.';
         errorDiv.classList.remove('hidden');
@@ -373,7 +398,7 @@ async function loadQuestions() {
         }
         
         questions = data.questions;
-        timeRemaining = data.time_remaining;
+        timeRemaining = Math.floor(data.time_remaining);
         allowBackNav = data.allow_back_navigation;
         
         document.getElementById('totalQ').textContent = questions.length;

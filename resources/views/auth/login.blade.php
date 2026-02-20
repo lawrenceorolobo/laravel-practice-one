@@ -72,7 +72,7 @@
                 </div>
 
                 <button type="submit" id="submitBtn"
-                    class="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+                    class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
                     <span id="btnText">Sign in</span>
                     <svg id="btnSpinner" class="hidden w-5 h-5 mx-auto animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -103,7 +103,7 @@
         // Sanitize error messages - never show SQL or technical errors
         function sanitizeErrorMessage(message) {
             if (!message || typeof message !== 'string') {
-                return 'An unexpected error occurred. Please try again.';
+                return 'Something went wrong. Give it another try.';
             }
             const technicalPatterns = [
                 'SQLSTATE', 'SQL:', 'Query', 'Connection refused', 
@@ -112,7 +112,7 @@
             ];
             for (const pattern of technicalPatterns) {
                 if (message.toLowerCase().includes(pattern.toLowerCase())) {
-                    return 'Service temporarily unavailable. Please try again later.';
+                    return 'We\'re having some trouble right now. Try again in a bit.';
                 }
             }
             return message;
@@ -149,9 +149,11 @@
                 if (res.ok) {
                     localStorage.setItem('token', result.token);
                     localStorage.setItem('user', JSON.stringify(result.user));
-                    window.location.href = '/dashboard';
+                    // Redirect based on subscription status
+                    const redirectUrl = result.user.has_active_subscription ? '/dashboard' : '/select-plan';
+                    window.location.href = redirectUrl;
                 } else {
-                    throw new Error(sanitizeErrorMessage(result.message || 'Invalid credentials'));
+                    throw new Error(sanitizeErrorMessage(result.message || 'Wrong email or password.'));
                 }
             } catch (err) {
                 errorDiv.textContent = sanitizeErrorMessage(err.message);

@@ -2,15 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicUid;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
-    use HasUuids;
+    use HasUuids, HasPublicUid;
+
+    protected string $uidPrefix = 'pay';
+    protected string $uidColumn = 'public_id';
 
     protected $fillable = [
+        'public_id',
         'user_id',
         'plan_id',
         'idempotency_key',
@@ -19,6 +24,8 @@ class Payment extends Model
         'billing_cycle',
         'paystack_reference',
         'paystack_transaction_id',
+        'flutterwave_reference',
+        'flutterwave_tx_id',
         'status',
         'paid_at',
         'expires_at',

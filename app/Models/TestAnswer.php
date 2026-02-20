@@ -47,8 +47,14 @@ class TestAnswer extends Model
         $pointsEarned = 0;
 
         if ($question->isTextInput()) {
-            // Text input requires manual grading or exact match
-            $isCorrect = null; // Will be graded manually
+            if ($question->expected_answer) {
+                $answer = strtolower(trim($this->text_answer ?? ''));
+                $accepted = array_map(fn($a) => strtolower(trim($a)), explode('||', $question->expected_answer));
+                $isCorrect = in_array($answer, $accepted, true);
+                $pointsEarned = $isCorrect ? $question->points : 0;
+            } else {
+                $isCorrect = null; // No expected answer set — manual grading
+            }
         } else {
             $correctLabels = $question->correctLabels;
             $selectedLabels = $this->selected_options ?? [];

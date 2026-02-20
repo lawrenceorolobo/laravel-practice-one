@@ -26,15 +26,17 @@ class DatabaseSeeder extends Seeder
         SubscriptionPlan::firstOrCreate(
             ['name' => 'Professional'],
             [
-                'monthly_price' => 5000.00, // NGN
+                'monthly_price' => 15000.00, // NGN - ₦15,000/month
                 'annual_discount_percent' => 15.00,
                 'features' => [
-                    'max_assessments' => 100,
-                    'max_invites_per_assessment' => 1000,
-                    'max_questions_per_assessment' => 200,
-                    'analytics' => true,
-                    'export_results' => true,
-                    'custom_branding' => true,
+                    'Unlimited Assessments',
+                    'Unlimited Candidates',
+                    'Advanced Analytics Dashboard',
+                    'Export Results to Excel',
+                    'Custom Branding',
+                    'Priority Support',
+                    'Anti-Fraud Detection',
+                    'Proctored Testing',
                 ],
                 'is_active' => true,
             ]

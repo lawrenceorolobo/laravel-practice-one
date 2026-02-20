@@ -197,7 +197,7 @@
             
             // Replace skeletons with actual data
             document.getElementById('totalUsersWrap').innerHTML = `<p class="text-2xl lg:text-3xl font-bold">${data.users?.total || 0}</p>`;
-            document.getElementById('activeSubscriptionsWrap').innerHTML = `<p class="text-2xl lg:text-3xl font-bold text-emerald-400">${data.users?.active || 0}</p>`;
+            document.getElementById('activeSubscriptionsWrap').innerHTML = `<p class="text-2xl lg:text-3xl font-bold text-emerald-400">${data.users?.active_subscriptions || 0}</p>`;
             document.getElementById('totalAssessmentsWrap').innerHTML = `<p class="text-2xl lg:text-3xl font-bold text-purple-400">${data.assessments?.total || 0}</p>`;
             document.getElementById('monthlyRevenueWrap').innerHTML = `<p class="text-2xl lg:text-3xl font-bold text-amber-400">₦${(data.revenue?.this_month || 0).toLocaleString()}</p>`;
         } catch (err) {

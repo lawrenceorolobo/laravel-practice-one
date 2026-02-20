@@ -136,7 +136,7 @@
         // Sanitize error messages - never show SQL or technical errors
         function sanitizeErrorMessage(message) {
             if (!message || typeof message !== 'string') {
-                return 'An unexpected error occurred. Please try again.';
+                return 'Something went wrong. Give it another try.';
             }
             // Check for technical error patterns
             const technicalPatterns = [
@@ -146,7 +146,7 @@
             ];
             for (const pattern of technicalPatterns) {
                 if (message.toLowerCase().includes(pattern.toLowerCase())) {
-                    return 'Service temporarily unavailable. Please try again later.';
+                    return 'We\'re having some trouble right now. Try again in a bit.';
                 }
             }
             return message;
@@ -159,7 +159,7 @@
             const confirmPassword = document.getElementById('confirmPassword').value;
 
             if (password !== confirmPassword) {
-                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.textContent = 'Passwords don\'t match — check and try again.';
                 errorDiv.classList.remove('hidden');
                 return;
             }
@@ -198,10 +198,17 @@
                     localStorage.setItem('user', JSON.stringify(result.user));
                     successDiv.textContent = 'Account created! Redirecting...';
                     successDiv.classList.remove('hidden');
-                    setTimeout(() => window.location.href = '/dashboard', 1500);
+                    // If OTP required, go to verify-email first
+                    let redirectUrl = '/select-plan';
+                    if (result.requires_otp) {
+                        redirectUrl = '/verify-email';
+                    } else if (result.user.has_active_subscription) {
+                        redirectUrl = '/dashboard';
+                    }
+                    setTimeout(() => window.location.href = redirectUrl, 1500);
                 } else {
                     const errors = result.errors ? Object.values(result.errors).flat().join(' ') : result.message;
-                    throw new Error(sanitizeErrorMessage(errors || 'Registration failed'));
+                    throw new Error(sanitizeErrorMessage(errors || 'Couldn\'t create your account. Try again.'));
                 }
             } catch (err) {
                 errorDiv.textContent = sanitizeErrorMessage(err.message);

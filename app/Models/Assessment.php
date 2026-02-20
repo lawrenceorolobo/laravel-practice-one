@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicUid;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,9 +10,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Assessment extends Model
 {
-    use HasUuids;
+    use HasUuids, HasPublicUid;
+
+    protected string $uidPrefix = 'asm';
+    protected string $uidColumn = 'public_id';
 
     protected $fillable = [
+        'public_id',
         'user_id',
         'title',
         'description',
@@ -27,6 +32,7 @@ class Assessment extends Model
         'start_datetime',
         'end_datetime',
         'status',
+        'access_code',
         'total_questions',
         'total_invites',
     ];

@@ -218,25 +218,42 @@ class AdminController extends Controller
      */
     public function dashboard(): JsonResponse
     {
-        $now = now();
         $lastMonth = now()->subMonth();
+
+        // Single query per table instead of multiple
+        $users = DB::selectOne("SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as new_this_month,
+            SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN subscription_status = 'active' THEN 1 ELSE 0 END) as active_subscriptions
+            FROM users", [$lastMonth]);
+
+        $assessments = DB::selectOne("SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as this_month
+            FROM assessments", [$lastMonth]);
+
+        $revenue = DB::selectOne("SELECT 
+            COALESCE(SUM(CASE WHEN status = 'success' THEN amount ELSE 0 END), 0) as total,
+            COALESCE(SUM(CASE WHEN status = 'success' AND paid_at >= ? THEN amount ELSE 0 END), 0) as this_month
+            FROM payments", [$lastMonth]);
 
         return response()->json([
             'users' => [
-                'total' => User::count(),
-                'new_this_month' => User::where('created_at', '>=', $lastMonth)->count(),
-                'active' => User::where('is_active', true)->count(),
+                'total' => (int) $users->total,
+                'new_this_month' => (int) $users->new_this_month,
+                'active' => (int) $users->active,
+                'active_subscriptions' => (int) $users->active_subscriptions,
             ],
             'assessments' => [
-                'total' => Assessment::count(),
-                'active' => Assessment::where('status', 'active')->count(),
-                'this_month' => Assessment::where('created_at', '>=', $lastMonth)->count(),
+                'total' => (int) $assessments->total,
+                'active' => (int) $assessments->active,
+                'this_month' => (int) $assessments->this_month,
             ],
             'revenue' => [
-                'total' => Payment::where('status', 'success')->sum('amount'),
-                'this_month' => Payment::where('status', 'success')
-                    ->where('paid_at', '>=', $lastMonth)
-                    ->sum('amount'),
+                'total' => (float) $revenue->total,
+                'this_month' => (float) $revenue->this_month,
             ],
         ]);
     }
@@ -430,9 +447,10 @@ class AdminController extends Controller
      */
     public function subscriptionPlans(): JsonResponse
     {
-        $plans = SubscriptionPlan::withCount(['users' => fn($q) => $q->where('subscription_status', 'active')])
-            ->orderBy('price')
-            ->get();
+        $plans = SubscriptionPlan::withCount(['payments as active_subscribers_count' => fn($q) => $q
+            ->where('status', 'success')
+            ->whereHas('user', fn($u) => $u->where('subscription_status', 'active'))
+        ])->orderBy('monthly_price')->get();
 
         return response()->json(['data' => $plans]);
     }
@@ -444,17 +462,15 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:100',
-            'price' => 'required|numeric|min:0',
-            'duration_days' => 'required|integer|min:1',
-            'max_assessments' => 'required|integer|min:1',
-            'max_invitees_per_assessment' => 'required|integer|min:1',
+            'monthly_price' => 'required|numeric|min:0',
+            'annual_discount_percent' => 'sometimes|numeric|min:0|max:100',
             'features' => 'nullable|array',
-            'description' => 'nullable|string|max:500',
             'is_active' => 'boolean',
         ]);
 
         $validated['features'] = $validated['features'] ?? [];
         $validated['is_active'] = $validated['is_active'] ?? true;
+        $validated['annual_discount_percent'] = $validated['annual_discount_percent'] ?? 15.00;
 
         $plan = SubscriptionPlan::create($validated);
 
@@ -473,12 +489,9 @@ class AdminController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:100',
-            'price' => 'sometimes|numeric|min:0',
-            'duration_days' => 'sometimes|integer|min:1',
-            'max_assessments' => 'sometimes|integer|min:1',
-            'max_invitees_per_assessment' => 'sometimes|integer|min:1',
+            'monthly_price' => 'sometimes|numeric|min:0',
+            'annual_discount_percent' => 'sometimes|numeric|min:0|max:100',
             'features' => 'nullable|array',
-            'description' => 'nullable|string|max:500',
             'is_active' => 'boolean',
         ]);
 
@@ -523,7 +536,8 @@ class AdminController extends Controller
     public function assessments(Request $request): JsonResponse
     {
         $query = Assessment::with(['user:id,first_name,last_name,email,company_name'])
-            ->withCount(['invitees', 'invitees as completed_count' => fn($q) => $q->where('status', 'completed')]);
+            ->withCount(['questions', 'invitees', 'invitees as completed_count' => fn($q) => $q->whereIn('status', ['completed'])])
+            ->withAvg(['testSessions as avg_score' => fn($q) => $q->whereIn('status', ['submitted', 'completed', 'timed_out'])], 'percentage');
 
         // Search
         if ($search = $request->input('search')) {
@@ -537,16 +551,24 @@ class AdminController extends Controller
 
         $assessments = $query->orderBy('created_at', 'desc')->paginate(50);
 
-        // Calculate avg score per assessment
-        $assessments->getCollection()->transform(function ($assessment) {
-            $assessment->avg_score = DB::table('test_sessions')
-                ->where('assessment_id', $assessment->id)
-                ->whereNotNull('score_percentage')
-                ->avg('score_percentage');
-            return $assessment;
-        });
-
         return response()->json($assessments);
+    }
+
+    /**
+     * Show full assessment details for admin
+     */
+    public function showAssessment(string $id): JsonResponse
+    {
+        $assessment = Assessment::with([
+            'user:id,first_name,last_name,email,company_name',
+            'questions.options',
+            'invitees.testSession.answers',
+        ])
+        ->withCount(['invitees', 'invitees as completed_count' => fn($q) => $q->where('status', 'completed')])
+        ->withAvg(['testSessions as avg_score' => fn($q) => $q->whereIn('status', ['submitted', 'completed', 'timed_out'])], 'percentage')
+        ->findOrFail($id);
+
+        return response()->json($assessment);
     }
 
     /**

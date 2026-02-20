@@ -91,8 +91,12 @@ async function loadSubscription() {
         const res = await fetch('/api/subscription/status', { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
             const data = await res.json();
-            document.getElementById('planName').textContent = data.plan?.name || 'Free Plan';
-            document.getElementById('planStatus').textContent = data.status === 'active' ? 'Active' : 'Inactive';
+            const planLabel = data.plan_name || (data.has_active ? 'Active Plan' : 'Free Plan');
+            document.getElementById('planName').textContent = planLabel;
+            document.getElementById('planStatus').textContent = data.has_active ? 'Active' : 'Inactive';
+            if (data.has_active) {
+                document.getElementById('planStatus').className = 'text-sm text-emerald-600 font-medium';
+            }
         }
     } catch (err) {
         document.getElementById('planName').textContent = 'Free Plan';
@@ -104,7 +108,7 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
     try {
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch('/api/auth/profile', {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -158,7 +162,7 @@ async function deleteAccount() {
     const confirmed = await showConfirm('Delete Account', 'Are you absolutely sure? This will permanently delete all your data including assessments, questions, and candidate records.', 'Delete My Account', 'danger');
     if (!confirmed) return;
     try {
-        await fetch('/api/auth/me', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        await fetch('/api/auth/profile', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
         localStorage.clear();
         window.location.href = '/';
     } catch (err) {

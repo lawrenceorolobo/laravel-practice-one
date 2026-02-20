@@ -2,17 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicUid;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 class Admin extends Authenticatable
 {
-    use HasApiTokens, HasUuids;
+    use HasApiTokens, HasUuids, HasPublicUid;
 
     protected $guard = 'admin';
+    protected string $uidPrefix = 'adm';
+    protected string $uidColumn = 'uid';
 
     protected $fillable = [
+        'uid',
         'email',
         'password',
         'name',
