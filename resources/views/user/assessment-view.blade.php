@@ -102,28 +102,102 @@
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-2">Question Type</label>
                 <select name="type" onchange="onTypeChange(this.value)" class="w-full px-4 py-2 border rounded-lg">
-                    <option value="single_choice">Single Choice</option>
-                    <option value="multiple_choice">Multiple Choice</option>
-                    <option value="text_input">Text Input</option>
+                    <optgroup label="Standard">
+                        <option value="single_choice">Single Choice</option>
+                        <option value="multiple_choice">Multiple Choice</option>
+                        <option value="true_false">True / False</option>
+                        <option value="text_input">Text Input</option>
+                        <option value="fill_blank">Fill in the Blank</option>
+                        <option value="numeric">Numeric Answer</option>
+                    </optgroup>
+                    <optgroup label="Sorting & Matching">
+                        <option value="ordering">Ordering</option>
+                        <option value="drag_drop_sort">Drag & Drop Sort</option>
+                        <option value="matching">Matching Pairs</option>
+                    </optgroup>
+                    <optgroup label="Psychometric / Reasoning">
+                        <option value="sequence_pattern">Sequence Pattern</option>
+                        <option value="matrix_pattern">Matrix Pattern</option>
+                        <option value="odd_one_out">Odd One Out</option>
+                        <option value="spatial_rotation">Spatial Rotation</option>
+                        <option value="shape_assembly">Shape Assembly</option>
+                        <option value="analogy">Analogy</option>
+                        <option value="pattern_recognition">Pattern Recognition</option>
+                    </optgroup>
+                    <optgroup label="Interactive">
+                        <option value="hotspot">Hotspot (Image Click)</option>
+                        <option value="code_snippet">Code Snippet</option>
+                        <option value="likert_scale">Likert Scale</option>
+                        <option value="word_problem">Word Problem</option>
+                        <option value="mental_maths">Mental Maths</option>
+                    </optgroup>
                 </select>
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-2">Question Text *</label>
                 <textarea name="text" required rows="2" class="w-full px-4 py-2 border rounded-lg" oninput="checkQuestionForm()"></textarea>
             </div>
-            <!-- Options for single/multiple choice -->
+
+            <!-- Options for choice-based types -->
             <div id="optionsContainer" class="mb-4">
                 <label class="block text-sm font-medium mb-2">Options</label>
                 <p id="optionsHint" class="text-xs text-slate-400 mb-2"></p>
                 <div id="optionsList" class="space-y-2"></div>
                 <button type="button" onclick="addOption()" class="mt-2 text-indigo-600 font-medium text-sm">+ Add Option</button>
             </div>
-            <!-- Expected answer for text input -->
+
+            <!-- Expected answer for text/fill_blank types -->
             <div id="textAnswerContainer" class="mb-4 hidden">
                 <label class="block text-sm font-medium mb-2">Expected Answer *</label>
                 <textarea name="expected_answer" rows="2" class="w-full px-4 py-2 border rounded-lg" placeholder="Enter the correct answer..."></textarea>
-                <p class="text-xs text-slate-400 mt-1">Candidate answers will be matched case-insensitively (trimmed). For flexible matching, separate multiple accepted answers with <strong>||</strong> e.g. <em>Paris || paris france</em></p>
+                <p class="text-xs text-slate-400 mt-1">For flexible matching, separate with <strong>||</strong> e.g. <em>Paris || paris france</em></p>
             </div>
+
+            <!-- Numeric config -->
+            <div id="numericContainer" class="mb-4 hidden">
+                <label class="block text-sm font-medium mb-2">Correct Numeric Answer *</label>
+                <input type="number" name="numeric_answer" step="any" class="w-full px-4 py-2 border rounded-lg mb-2" placeholder="e.g. 42">
+                <label class="block text-sm font-medium mb-2">Tolerance (±)</label>
+                <input type="number" name="numeric_tolerance" step="any" value="0" min="0" class="w-full px-4 py-2 border rounded-lg">
+                <p class="text-xs text-slate-400 mt-1">Set to 0 for exact match, or allow margin (e.g. 0.5)</p>
+            </div>
+
+            <!-- Ordering items -->
+            <div id="orderingContainer" class="mb-4 hidden">
+                <label class="block text-sm font-medium mb-2">Items (in CORRECT order)</label>
+                <p class="text-xs text-slate-400 mb-2">Add items top-to-bottom in the correct sequence. They'll be shuffled during the test.</p>
+                <div id="orderingList" class="space-y-2"></div>
+                <button type="button" onclick="addOrderingItem()" class="mt-2 text-indigo-600 font-medium text-sm">+ Add Item</button>
+            </div>
+
+            <!-- Matching pairs -->
+            <div id="matchingContainer" class="mb-4 hidden">
+                <label class="block text-sm font-medium mb-2">Matching Pairs</label>
+                <p class="text-xs text-slate-400 mb-2">Define left → right correct pairings</p>
+                <div id="matchingList" class="space-y-2"></div>
+                <button type="button" onclick="addMatchingPair()" class="mt-2 text-indigo-600 font-medium text-sm">+ Add Pair</button>
+            </div>
+
+            <!-- Likert config -->
+            <div id="likertContainer" class="mb-4 hidden">
+                <label class="block text-sm font-medium mb-2">Scale Labels</label>
+                <p class="text-xs text-slate-400 mb-2">Customize the 5-point scale labels (or keep defaults)</p>
+                <div class="grid grid-cols-5 gap-2">
+                    <input type="text" name="likert_1" value="Strongly Disagree" class="px-2 py-1 border rounded text-xs text-center">
+                    <input type="text" name="likert_2" value="Disagree" class="px-2 py-1 border rounded text-xs text-center">
+                    <input type="text" name="likert_3" value="Neutral" class="px-2 py-1 border rounded text-xs text-center">
+                    <input type="text" name="likert_4" value="Agree" class="px-2 py-1 border rounded text-xs text-center">
+                    <input type="text" name="likert_5" value="Strongly Agree" class="px-2 py-1 border rounded text-xs text-center">
+                </div>
+            </div>
+
+            <!-- Media URL for pattern/image-based types -->
+            <div id="mediaContainer" class="mb-4 hidden">
+                <label class="block text-sm font-medium mb-2">Question Image URL (optional)</label>
+                <input type="url" name="media_url" class="w-full px-4 py-2 border rounded-lg" placeholder="https://example.com/pattern.png">
+                <p class="text-xs text-slate-400 mt-1">Image displayed above the question for visual/pattern types</p>
+            </div>
+
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-2">Points</label>
                 <input type="number" name="points" value="1" min="1" class="w-full px-4 py-2 border rounded-lg">
@@ -411,28 +485,91 @@ async function loadInvitees() {
 }
 
 let currentType = 'single_choice';
+let orderingCount = 0;
+let matchingCount = 0;
+
+// Types grouped by form section needed
+const CHOICE_TYPES = ['single_choice', 'multiple_choice', 'true_false', 'odd_one_out', 'analogy',
+    'sequence_pattern', 'matrix_pattern', 'spatial_rotation', 'shape_assembly', 'pattern_recognition', 'hotspot'];
+const TEXT_TYPES = ['text_input', 'fill_blank', 'code_snippet', 'word_problem', 'mental_maths'];
+const ORDERING_TYPES = ['ordering', 'drag_drop_sort'];
+const PATTERN_TYPES = ['sequence_pattern', 'matrix_pattern', 'spatial_rotation', 'shape_assembly',
+    'pattern_recognition', 'hotspot', 'analogy'];
 
 function onTypeChange(type) {
     currentType = type;
-    const optionsContainer = document.getElementById('optionsContainer');
-    const textContainer = document.getElementById('textAnswerContainer');
+    const containers = ['optionsContainer', 'textAnswerContainer', 'numericContainer',
+        'orderingContainer', 'matchingContainer', 'likertContainer', 'mediaContainer'];
+    containers.forEach(id => document.getElementById(id).classList.add('hidden'));
+
     const hint = document.getElementById('optionsHint');
 
-    if (type === 'text_input') {
-        optionsContainer.classList.add('hidden');
-        textContainer.classList.remove('hidden');
-    } else {
-        optionsContainer.classList.remove('hidden');
-        textContainer.classList.add('hidden');
+    if (CHOICE_TYPES.includes(type)) {
+        document.getElementById('optionsContainer').classList.remove('hidden');
         hint.textContent = type === 'multiple_choice'
             ? 'Select one or more correct answers (but not all)'
             : 'Select the one correct answer';
-        // Reset and add default options
         document.getElementById('optionsList').innerHTML = '';
         optionCount = 0;
-        const defaults = type === 'multiple_choice' ? 3 : 2;
-        for (let i = 0; i < defaults; i++) addOption();
+        if (type === 'true_false') {
+            addOptionWithText('True');
+            addOptionWithText('False');
+        } else {
+            const defaults = type === 'multiple_choice' ? 3 : 2;
+            for (let i = 0; i < defaults; i++) addOption();
+        }
+    } else if (TEXT_TYPES.includes(type)) {
+        document.getElementById('textAnswerContainer').classList.remove('hidden');
+    } else if (type === 'numeric') {
+        document.getElementById('numericContainer').classList.remove('hidden');
+    } else if (ORDERING_TYPES.includes(type)) {
+        document.getElementById('orderingContainer').classList.remove('hidden');
+        document.getElementById('orderingList').innerHTML = '';
+        orderingCount = 0;
+        for (let i = 0; i < 3; i++) addOrderingItem();
+    } else if (type === 'matching') {
+        document.getElementById('matchingContainer').classList.remove('hidden');
+        document.getElementById('matchingList').innerHTML = '';
+        matchingCount = 0;
+        for (let i = 0; i < 3; i++) addMatchingPair();
+    } else if (type === 'likert_scale') {
+        document.getElementById('likertContainer').classList.remove('hidden');
     }
+
+    // Show media URL field for visual/pattern types
+    if (PATTERN_TYPES.includes(type)) {
+        document.getElementById('mediaContainer').classList.remove('hidden');
+    }
+}
+
+function addOptionWithText(text) {
+    addOption();
+    document.querySelector(`[name="option_${optionCount - 1}"]`).value = text;
+}
+
+function addOrderingItem(value = '') {
+    const list = document.getElementById('orderingList');
+    list.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-2 items-center">
+            <span class="text-xs text-slate-400 w-6">${orderingCount + 1}.</span>
+            <input type="text" name="ordering_${orderingCount}" value="${value}" placeholder="Item ${orderingCount + 1}" class="flex-1 px-3 py-2 border rounded-lg">
+            ${orderingCount >= 2 ? `<button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-lg">&times;</button>` : ''}
+        </div>
+    `);
+    orderingCount++;
+}
+
+function addMatchingPair(left = '', right = '') {
+    const list = document.getElementById('matchingList');
+    list.insertAdjacentHTML('beforeend', `
+        <div class="flex gap-2 items-center">
+            <input type="text" name="match_left_${matchingCount}" value="${left}" placeholder="Left item" class="flex-1 px-3 py-2 border rounded-lg">
+            <span class="text-slate-400">→</span>
+            <input type="text" name="match_right_${matchingCount}" value="${right}" placeholder="Right item" class="flex-1 px-3 py-2 border rounded-lg">
+            ${matchingCount >= 2 ? `<button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-lg">&times;</button>` : ''}
+        </div>
+    `);
+    matchingCount++;
 }
 
 let editingQuestionId = null;
@@ -462,9 +599,27 @@ function editQuestion(q) {
     currentType = q.question_type;
     onTypeChange(q.question_type);
     
-    if (q.question_type === 'text_input') {
+    const meta = q.question_metadata || {};
+    
+    if (TEXT_TYPES.includes(q.question_type)) {
         document.querySelector('[name="expected_answer"]').value = q.expected_answer || '';
-    } else if (q.options) {
+    } else if (q.question_type === 'numeric') {
+        document.querySelector('[name="numeric_answer"]').value = q.expected_answer || '';
+        document.querySelector('[name="numeric_tolerance"]').value = meta.tolerance || 0;
+    } else if (ORDERING_TYPES.includes(q.question_type) && q.options) {
+        document.getElementById('orderingList').innerHTML = '';
+        orderingCount = 0;
+        q.options.forEach(opt => addOrderingItem(opt.option_text || opt.text || ''));
+    } else if (q.question_type === 'matching' && meta.correct_pairs) {
+        document.getElementById('matchingList').innerHTML = '';
+        matchingCount = 0;
+        Object.entries(meta.correct_pairs).forEach(([left, right]) => addMatchingPair(left, right));
+    } else if (q.question_type === 'likert_scale' && meta.scale_labels) {
+        meta.scale_labels.forEach((label, i) => {
+            const el = document.querySelector(`[name="likert_${i + 1}"]`);
+            if (el) el.value = label;
+        });
+    } else if (CHOICE_TYPES.includes(q.question_type) && q.options) {
         document.getElementById('optionsList').innerHTML = '';
         optionCount = 0;
         q.options.forEach((opt, i) => {
@@ -481,6 +636,12 @@ function editQuestion(q) {
             }
         });
     }
+    
+    // Restore media URL
+    if (meta.media_url) {
+        document.querySelector('[name="media_url"]').value = meta.media_url;
+    }
+    
     checkQuestionForm();
 }
 
@@ -534,7 +695,11 @@ document.getElementById('questionForm').addEventListener('submit', async (e) => 
         points: parseInt(form.points.value),
     };
 
-    if (type === 'text_input') {
+    let metadata = {};
+    const mediaUrl = form.media_url?.value?.trim();
+    if (mediaUrl) metadata.media_url = mediaUrl;
+
+    if (TEXT_TYPES.includes(type)) {
         const expected = form.expected_answer.value.trim();
         if (!expected) {
             errEl.textContent = 'Please enter the expected answer.';
@@ -543,7 +708,50 @@ document.getElementById('questionForm').addEventListener('submit', async (e) => 
         }
         body.expected_answer = expected;
         body.options = [];
-    } else {
+    } else if (type === 'numeric') {
+        const numAnswer = form.numeric_answer.value;
+        if (!numAnswer && numAnswer !== '0') {
+            errEl.textContent = 'Please enter the correct numeric answer.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        body.expected_answer = numAnswer;
+        body.options = [];
+        metadata.tolerance = parseFloat(form.numeric_tolerance.value) || 0;
+    } else if (ORDERING_TYPES.includes(type)) {
+        const items = [];
+        for (let i = 0; i < orderingCount; i++) {
+            const val = form[`ordering_${i}`]?.value?.trim();
+            if (val) items.push(val);
+        }
+        if (items.length < 2) {
+            errEl.textContent = 'Please add at least 2 ordering items.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        // Store as options with correct order
+        body.options = items.map((text, i) => ({ text, is_correct: true, option_order: i }));
+    } else if (type === 'matching') {
+        const pairs = {};
+        for (let i = 0; i < matchingCount; i++) {
+            const left = form[`match_left_${i}`]?.value?.trim();
+            const right = form[`match_right_${i}`]?.value?.trim();
+            if (left && right) pairs[left] = right;
+        }
+        if (Object.keys(pairs).length < 2) {
+            errEl.textContent = 'Please add at least 2 matching pairs.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        metadata.correct_pairs = pairs;
+        // Store left items as options for display
+        body.options = Object.keys(pairs).map((text, i) => ({ text, is_correct: true, option_order: i }));
+    } else if (type === 'likert_scale') {
+        const labels = [];
+        for (let i = 1; i <= 5; i++) labels.push(form[`likert_${i}`]?.value || '');
+        metadata.scale_labels = labels;
+        body.options = [];
+    } else if (CHOICE_TYPES.includes(type)) {
         const options = [];
         for (let i = 0; i < optionCount; i++) {
             const opt = form[`option_${i}`]?.value;
@@ -568,6 +776,10 @@ document.getElementById('questionForm').addEventListener('submit', async (e) => 
             return;
         }
         body.options = options;
+    }
+
+    if (Object.keys(metadata).length > 0) {
+        body.question_metadata = metadata;
     }
 
     try {

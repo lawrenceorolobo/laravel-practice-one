@@ -67,47 +67,130 @@
     <!-- Quiz State -->
     <div id="quizState" class="hidden">
         <!-- Top Bar -->
-        <div class="bg-white border-b sticky top-0 z-50 px-6 py-4">
-            <div class="max-w-4xl mx-auto flex items-center justify-between">
-                <div>
-                    <h1 class="font-semibold text-slate-900" id="quizTitle">Assessment</h1>
+        <div class="bg-white border-b sticky top-0 z-50 px-4 sm:px-6 py-3">
+            <div class="max-w-6xl mx-auto flex items-center justify-between">
+                <div class="min-w-0">
+                    <h1 class="font-semibold text-slate-900 truncate" id="quizTitle">Assessment</h1>
                     <p class="text-sm text-slate-500">Question <span id="currentQ">1</span> of <span id="totalQ">-</span></p>
                 </div>
-                <div class="flex items-center gap-4">
-                    <div id="timer" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-mono font-medium">00:00</div>
-                    <button onclick="submitTest()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700">
-                        Submit Test
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <div id="timer" class="bg-red-100 text-red-700 px-3 py-2 rounded-lg font-mono font-medium text-sm">00:00</div>
+                    <button onclick="submitTest()" class="bg-indigo-600 text-white px-3 sm:px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 text-sm">
+                        Submit
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Question Card -->
-        <div class="max-w-4xl mx-auto p-6">
-            <div class="bg-white rounded-2xl shadow-lg p-8">
-                <p class="text-lg font-medium text-slate-900 mb-6" id="questionText">Loading question...</p>
+        <!-- Auto-End Warning Banner -->
+        <div id="autoEndBanner" class="hidden bg-red-600 text-white text-center py-2 text-sm font-medium">
+            ⚠ Leaving this tab will automatically end your test
+        </div>
 
-                <div id="optionsContainer" class="space-y-3">
-                    <!-- Options rendered here -->
-                </div>
+        <!-- Webcam Overlay (shown when webcam_required) -->
+        <div id="webcamOverlay" class="hidden fixed bottom-4 right-4 z-40 rounded-xl overflow-hidden shadow-2xl border-2 border-slate-700" style="width:180px;height:135px;">
+            <video id="webcamVideo" autoplay muted playsinline class="w-full h-full object-cover bg-black"></video>
+            <div class="absolute top-2 left-2 flex items-center gap-1">
+                <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span class="text-xs text-white font-medium drop-shadow">REC</span>
+            </div>
+        </div>
 
-                <div id="textAnswerContainer" class="hidden">
-                    <textarea id="textAnswer" rows="4" 
-                        class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Type your answer here..."></textarea>
+        <!-- Main Content: Sidebar + Question -->
+        <div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-4 p-4 sm:p-6">
+
+            <!-- Question Navigation Panel -->
+            <div class="lg:w-56 flex-shrink-0 order-2 lg:order-1">
+                <div class="bg-white rounded-xl shadow-md border border-slate-200 p-4 lg:sticky lg:top-24">
+                    <h3 class="text-sm font-semibold text-slate-700 mb-3">Questions</h3>
+                    <div id="questionNav" class="flex flex-wrap lg:flex-col gap-2">
+                        <!-- Question number buttons rendered by JS -->
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-100 space-y-1">
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Answered
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span class="w-3 h-3 rounded-full bg-slate-200 inline-block"></span> Unanswered
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-500">
+                            <span class="w-3 h-3 rounded-full bg-indigo-500 inline-block"></span> Current
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-400 text-center">
+                        <span id="answeredCount">0</span>/<span id="totalCount">0</span> answered
+                    </div>
                 </div>
             </div>
 
-            <!-- Navigation -->
-            <div class="flex justify-between mt-6">
-                <button id="prevBtn" onclick="prevQuestion()" 
-                    class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Previous
-                </button>
-                <button id="nextBtn" onclick="nextQuestion()" 
-                    class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
-                    Next Question
-                </button>
+            <!-- Question Card -->
+            <div class="flex-1 order-1 lg:order-2">
+                <div class="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="bg-indigo-100 text-indigo-700 text-sm font-semibold px-3 py-1 rounded-full" id="questionBadge">Q1</span>
+                        <span class="text-sm text-slate-400" id="questionType"></span>
+                    </div>
+                    <p class="text-lg font-medium text-slate-900 mb-6" id="questionText">Loading question...</p>
+
+                    <div id="optionsContainer" class="space-y-3">
+                        <!-- Options rendered here -->
+                    </div>
+
+                    <div id="textAnswerContainer" class="hidden">
+                        <textarea id="textAnswer" rows="4" 
+                            class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Type your answer here..."></textarea>
+                    </div>
+
+                    <!-- Numeric Input -->
+                    <div id="numericContainer" class="hidden">
+                        <input type="number" id="numericAnswer" step="any"
+                            class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-lg"
+                            placeholder="Enter your numeric answer...">
+                    </div>
+
+                    <!-- Fill in Blank -->
+                    <div id="fillBlankContainer" class="hidden">
+                        <input type="text" id="fillBlankAnswer"
+                            class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Fill in the blank...">
+                    </div>
+
+                    <!-- Ordering / Drag Sort -->
+                    <div id="orderingContainer" class="hidden">
+                        <p class="text-sm text-slate-500 mb-3">Drag items to reorder, or use the arrows:</p>
+                        <div id="orderingList" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Matching -->
+                    <div id="matchingContainer" class="hidden">
+                        <p class="text-sm text-slate-500 mb-3">Match each item on the left with the correct item on the right:</p>
+                        <div id="matchingPairs" class="space-y-3"></div>
+                    </div>
+
+                    <!-- Likert Scale -->
+                    <div id="likertContainer" class="hidden">
+                        <div id="likertScale" class="flex justify-between gap-2 mt-2"></div>
+                    </div>
+
+                    <!-- Pattern / Visual (shows image from metadata) -->
+                    <div id="patternContainer" class="hidden">
+                        <div id="patternVisual" class="flex justify-center mb-6"></div>
+                        <div id="patternOptions" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex justify-between mt-6">
+                    <button id="prevBtn" onclick="prevQuestion()" 
+                        class="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← Previous
+                    </button>
+                    <button id="nextBtn" onclick="nextQuestion()" 
+                        class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+                        Next →
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -188,6 +271,15 @@ let timeRemaining = 0;
 let timerInterval = null;
 let allowBackNav = true;
 let confirmResolve = null;
+let autoEndOnLeave = false;
+let webcamRequired = false;
+let webcamStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isSubmitting = false;
+
+const CLOUDINARY_CLOUD = '{{ config("services.cloudinary.cloud_name", "") }}';
+const CLOUDINARY_PRESET = '{{ config("services.cloudinary.upload_preset", "") }}';
 
 // Toast Notification System
 function showToast(message, type = 'info', duration = 4000) {
@@ -258,10 +350,26 @@ document.addEventListener('DOMContentLoaded', () => {
     validateToken();
 });
 
-// Proctoring
+// Proctoring — auto-end on tab switch
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden && sessionId) {
+    if (document.hidden && sessionId && !isSubmitting) {
         logProctoring('tab_switch');
+        if (autoEndOnLeave) {
+            // Immediately submit via sendBeacon (works even when tab is closing)
+            const url = `/api/test/submit/${TOKEN}`;
+            navigator.sendBeacon(url);
+            isSubmitting = true;
+            clearInterval(timerInterval);
+            if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); }
+        }
+    }
+});
+
+// Also handle tab/window close
+window.addEventListener('beforeunload', (e) => {
+    if (sessionId && autoEndOnLeave && !isSubmitting) {
+        navigator.sendBeacon(`/api/test/submit/${TOKEN}`);
+        isSubmitting = true;
     }
 });
 
@@ -324,9 +432,56 @@ function showQuiz(assessment) {
     document.getElementById('quizState').classList.remove('hidden');
     document.getElementById('quizTitle').textContent = assessment?.title || assessmentData?.title || 'Assessment';
     
+    // Auto-end on leave
+    autoEndOnLeave = assessment?.auto_end_on_leave || false;
+    if (autoEndOnLeave) {
+        document.getElementById('autoEndBanner').classList.remove('hidden');
+    }
+    
+    // Webcam
+    webcamRequired = assessment?.webcam_required || false;
+    if (webcamRequired) { startWebcam(); }
+    
     // Request fullscreen
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(() => {});
+    }
+}
+
+async function startWebcam() {
+    try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const video = document.getElementById('webcamVideo');
+        video.srcObject = webcamStream;
+        document.getElementById('webcamOverlay').classList.remove('hidden');
+
+        // Start recording if Cloudinary is configured
+        if (CLOUDINARY_CLOUD && CLOUDINARY_PRESET) {
+            try {
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                    ? 'video/webm;codecs=vp9'
+                    : MediaRecorder.isTypeSupported('video/webm')
+                        ? 'video/webm'
+                        : 'video/mp4';
+
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(webcamStream, { mimeType, videoBitsPerSecond: 500000 });
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                // Record in 10-second chunks for reliability
+                mediaRecorder.start(10000);
+                console.log('Webcam recording started');
+            } catch (recErr) {
+                console.warn('MediaRecorder not available:', recErr);
+            }
+        }
+    } catch (err) {
+        if (webcamRequired) {
+            toastError('Webcam access is required for this assessment. Please enable your camera and refresh.');
+        }
     }
 }
 
@@ -413,37 +568,264 @@ function renderQuestion() {
     const q = questions[currentIndex];
     document.getElementById('currentQ').textContent = currentIndex + 1;
     document.getElementById('questionText').textContent = q.question_text;
-    
-    const optionsContainer = document.getElementById('optionsContainer');
-    const textContainer = document.getElementById('textAnswerContainer');
-    
-    if (q.question_type === 'text_input') {
-        optionsContainer.classList.add('hidden');
-        textContainer.classList.remove('hidden');
+    document.getElementById('questionBadge').textContent = 'Q' + (currentIndex + 1);
+    const typeLabels = {single_choice:'Single Choice',multiple_choice:'Multiple Choice',text_input:'Text Answer',true_false:'True/False',ordering:'Ordering',matching:'Matching',fill_blank:'Fill in Blank',numeric:'Numeric',sequence_pattern:'Pattern Sequence',matrix_pattern:'Matrix',odd_one_out:'Odd One Out',spatial_rotation:'Spatial',shape_assembly:'Shape Assembly',analogy:'Analogy',drag_drop_sort:'Drag & Drop',hotspot:'Hotspot',code_snippet:'Code',likert_scale:'Rating',pattern_recognition:'Pattern Recognition',mental_maths:'Mental Maths',word_problem:'Word Problem'};
+    document.getElementById('questionType').textContent = typeLabels[q.question_type] || q.question_type;
+
+    // Hide all containers
+    const containers = ['optionsContainer','textAnswerContainer','numericContainer','fillBlankContainer','orderingContainer','matchingContainer','likertContainer','patternContainer'];
+    containers.forEach(id => document.getElementById(id).classList.add('hidden'));
+
+    const type = q.question_type;
+    const textTypes = ['text_input', 'code_snippet', 'word_problem', 'mental_maths'];
+    const choiceTypes = ['single_choice', 'multiple_choice', 'true_false', 'odd_one_out', 'analogy'];
+    const patternTypes = ['sequence_pattern', 'matrix_pattern', 'spatial_rotation', 'shape_assembly', 'pattern_recognition', 'hotspot'];
+
+    if (textTypes.includes(type)) {
+        document.getElementById('textAnswerContainer').classList.remove('hidden');
         document.getElementById('textAnswer').value = answers[q.id]?.text || '';
-    } else {
-        textContainer.classList.add('hidden');
-        optionsContainer.classList.remove('hidden');
-        
+        document.getElementById('textAnswer').placeholder = type === 'code_snippet' ? 'Write your code here...' : type === 'mental_maths' ? 'Enter your calculated answer...' : type === 'word_problem' ? 'Show your working and answer...' : 'Type your answer here...';
+    } else if (type === 'numeric') {
+        document.getElementById('numericContainer').classList.remove('hidden');
+        document.getElementById('numericAnswer').value = answers[q.id]?.text || '';
+    } else if (type === 'fill_blank') {
+        document.getElementById('fillBlankContainer').classList.remove('hidden');
+        document.getElementById('fillBlankAnswer').value = answers[q.id]?.text || '';
+    } else if (type === 'ordering' || type === 'drag_drop_sort') {
+        document.getElementById('orderingContainer').classList.remove('hidden');
+        renderOrderingQuestion(q);
+    } else if (type === 'matching') {
+        document.getElementById('matchingContainer').classList.remove('hidden');
+        renderMatchingQuestion(q);
+    } else if (type === 'likert_scale') {
+        document.getElementById('likertContainer').classList.remove('hidden');
+        renderLikertQuestion(q);
+    } else if (patternTypes.includes(type)) {
+        document.getElementById('patternContainer').classList.remove('hidden');
+        renderPatternQuestion(q);
+    } else if (choiceTypes.includes(type)) {
+        document.getElementById('optionsContainer').classList.remove('hidden');
         const selectedOpts = answers[q.id]?.options || [];
-        const isMultiple = q.question_type === 'multiple_choice';
-        
-        optionsContainer.innerHTML = q.options.map(opt => `
+        const isMultiple = type === 'multiple_choice';
+
+        // For true_false, override options if none exist
+        let opts = q.options;
+        if (type === 'true_false' && (!opts || opts.length === 0)) {
+            opts = [{label: 'A', text: 'True'}, {label: 'B', text: 'False'}];
+        }
+
+        document.getElementById('optionsContainer').innerHTML = (opts || []).map(opt => `
             <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition ${selectedOpts.includes(opt.label) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}">
-                <input type="${isMultiple ? 'checkbox' : 'radio'}" 
-                    name="option" value="${opt.label}" 
-                    ${selectedOpts.includes(opt.label) ? 'checked' : ''}
-                    onchange="selectOption('${opt.label}')"
-                    class="mr-3 text-indigo-600 focus:ring-indigo-500">
+                <input type="${isMultiple ? 'checkbox' : 'radio'}" name="option" value="${opt.label}" ${selectedOpts.includes(opt.label) ? 'checked' : ''} onchange="selectOption('${opt.label}')" class="mr-3 text-indigo-600 focus:ring-indigo-500">
                 <span class="font-medium mr-2">${opt.label}.</span>
+                ${opt.media_url ? `<img src="${opt.media_url}" class="w-16 h-16 object-contain rounded mr-3" alt="">` : ''}
                 <span>${opt.text}</span>
             </label>
         `).join('');
+    } else {
+        // Fallback: show as options if they exist, or text input
+        if (q.options && q.options.length > 0) {
+            document.getElementById('optionsContainer').classList.remove('hidden');
+            const selectedOpts = answers[q.id]?.options || [];
+            document.getElementById('optionsContainer').innerHTML = q.options.map(opt => `
+                <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition ${selectedOpts.includes(opt.label) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}">
+                    <input type="radio" name="option" value="${opt.label}" ${selectedOpts.includes(opt.label) ? 'checked' : ''} onchange="selectOption('${opt.label}')" class="mr-3 text-indigo-600 focus:ring-indigo-500">
+                    <span class="font-medium mr-2">${opt.label}.</span>
+                    <span>${opt.text}</span>
+                </label>
+            `).join('');
+        } else {
+            document.getElementById('textAnswerContainer').classList.remove('hidden');
+            document.getElementById('textAnswer').value = answers[q.id]?.text || '';
+        }
     }
-    
-    // Navigation visibility
+
     document.getElementById('prevBtn').disabled = !allowBackNav || currentIndex === 0;
-    document.getElementById('nextBtn').textContent = currentIndex === questions.length - 1 ? 'Finish' : 'Next Question';
+    document.getElementById('nextBtn').textContent = currentIndex === questions.length - 1 ? 'Finish' : 'Next →';
+    renderQuestionNav();
+}
+
+// Ordering / Drag-Drop Sort
+function renderOrderingQuestion(q) {
+    const saved = answers[q.id]?.ordering;
+    let items = saved ? saved : q.options.map(o => ({label: o.label, text: o.text}));
+
+    const list = document.getElementById('orderingList');
+    list.innerHTML = items.map((item, i) => `
+        <div class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg" data-idx="${i}">
+            <span class="text-sm font-bold text-slate-400 w-6">${i + 1}.</span>
+            <span class="flex-1 font-medium text-slate-700">${item.text}</span>
+            <div class="flex flex-col gap-0.5">
+                <button onclick="moveOrderItem(${i}, -1)" class="p-1 hover:bg-slate-200 rounded text-slate-500 ${i === 0 ? 'opacity-30' : ''}" ${i === 0 ? 'disabled' : ''}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                </button>
+                <button onclick="moveOrderItem(${i}, 1)" class="p-1 hover:bg-slate-200 rounded text-slate-500 ${i === items.length - 1 ? 'opacity-30' : ''}" ${i === items.length - 1 ? 'disabled' : ''}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function moveOrderItem(idx, dir) {
+    const q = questions[currentIndex];
+    if (!answers[q.id]) answers[q.id] = {};
+    let items = answers[q.id].ordering || q.options.map(o => ({label: o.label, text: o.text}));
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= items.length) return;
+    [items[idx], items[newIdx]] = [items[newIdx], items[idx]];
+    answers[q.id].ordering = items;
+    renderOrderingQuestion(q);
+    saveAnswer(q.id);
+    renderQuestionNav();
+}
+
+// Matching
+function renderMatchingQuestion(q) {
+    const meta = q.question_metadata || {};
+    const left = meta.left_items || q.options.map(o => o.text);
+    const right = meta.right_items || q.options.map(o => o.label);
+    const saved = answers[q.id]?.matching || {};
+
+    document.getElementById('matchingPairs').innerHTML = left.map((item, i) => {
+        const key = `item_${i}`;
+        return `
+            <div class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span class="flex-1 font-medium text-slate-700 text-sm">${item}</span>
+                <svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                <select onchange="matchItem('${key}', this.value)" class="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 min-w-[140px]">
+                    <option value="">Select...</option>
+                    ${right.map(r => `<option value="${r}" ${saved[key] === r ? 'selected' : ''}>${r}</option>`).join('')}
+                </select>
+            </div>
+        `;
+    }).join('');
+}
+
+function matchItem(key, value) {
+    const q = questions[currentIndex];
+    if (!answers[q.id]) answers[q.id] = {};
+    if (!answers[q.id].matching) answers[q.id].matching = {};
+    answers[q.id].matching[key] = value;
+    saveAnswer(q.id);
+    renderQuestionNav();
+}
+
+// Likert Scale
+function renderLikertQuestion(q) {
+    const meta = q.question_metadata || {};
+    const labels = meta.scale_labels || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
+    const saved = answers[q.id]?.text || '';
+
+    document.getElementById('likertScale').innerHTML = labels.map((label, i) => {
+        const val = String(i + 1);
+        return `
+            <label class="flex-1 cursor-pointer">
+                <div class="flex flex-col items-center gap-2 p-3 border rounded-lg transition ${saved === val ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}">
+                    <input type="radio" name="likert" value="${val}" ${saved === val ? 'checked' : ''} onchange="selectLikert('${val}')" class="text-indigo-600">
+                    <span class="text-xs text-center text-slate-600 leading-tight">${label}</span>
+                </div>
+            </label>
+        `;
+    }).join('');
+}
+
+function selectLikert(val) {
+    const q = questions[currentIndex];
+    if (!answers[q.id]) answers[q.id] = {};
+    answers[q.id].text = val;
+    saveAnswer(q.id);
+    renderLikertQuestion(q);
+    renderQuestionNav();
+}
+
+// Pattern / Visual Types
+function renderPatternQuestion(q) {
+    const meta = q.question_metadata || {};
+    const visual = document.getElementById('patternVisual');
+    const optionsGrid = document.getElementById('patternOptions');
+
+    // Show pattern image or grid
+    if (meta.image_url) {
+        visual.innerHTML = `<img src="${meta.image_url}" class="max-h-64 rounded-lg border border-slate-200 shadow-sm" alt="Pattern">`;
+    } else if (meta.grid) {
+        visual.innerHTML = renderPatternGrid(meta.grid);
+    } else {
+        visual.innerHTML = '<p class="text-slate-400 text-sm">Visual pattern displayed here</p>';
+    }
+
+    // Render option cards with images or text
+    const selected = answers[q.id]?.options || [];
+    optionsGrid.innerHTML = (q.options || []).map(opt => `
+        <button onclick="selectOption('${opt.label}')" 
+            class="p-4 border-2 rounded-xl text-center transition-all ${selected.includes(opt.label) ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'}">
+            ${opt.media_url ? `<img src="${opt.media_url}" class="w-full h-24 object-contain mb-2 rounded" alt="">` : ''}
+            <span class="font-semibold text-sm">${opt.label}</span>
+            ${opt.text ? `<span class="block text-xs text-slate-500 mt-1">${opt.text}</span>` : ''}
+        </button>
+    `).join('');
+}
+
+function renderPatternGrid(grid) {
+    if (!Array.isArray(grid)) return '';
+    const colors = { 0: '#f1f5f9', 1: '#3b82f6', 2: '#ef4444', 3: '#22c55e', 4: '#f59e0b', 5: '#8b5cf6', '?': '#e2e8f0' };
+    return `<div class="inline-grid gap-1 p-3 bg-white border border-slate-200 rounded-lg shadow-sm" style="grid-template-columns: repeat(${grid[0]?.length || 3}, 2.5rem)">
+        ${grid.flat().map(cell => `<div class="w-10 h-10 rounded flex items-center justify-center text-sm font-bold" style="background:${colors[cell] || '#f1f5f9'}">${cell === '?' ? '?' : ''}</div>`).join('')}
+    </div>`;
+}
+
+function renderQuestionNav() {
+    const nav = document.getElementById('questionNav');
+    let cnt = 0;
+    nav.innerHTML = questions.map((q, i) => {
+        const ans = answers[q.id];
+        const isAnswered = ans && (
+            (ans.options && ans.options.length > 0) || 
+            ans.text || 
+            ans.ordering || 
+            (ans.matching && Object.keys(ans.matching).length > 0)
+        );
+        if (isAnswered) cnt++;
+        const isCur = i === currentIndex;
+        let cls = 'w-9 h-9 rounded-lg text-sm font-semibold flex items-center justify-center cursor-pointer transition-all ';
+        if (isCur) cls += 'bg-indigo-600 text-white ring-2 ring-indigo-300';
+        else if (isAnswered) cls += 'bg-emerald-500 text-white';
+        else cls += 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+        return `<button onclick="jumpToQuestion(${i})" class="${cls}">${i+1}</button>`;
+    }).join('');
+    document.getElementById('answeredCount').textContent = cnt;
+    document.getElementById('totalCount').textContent = questions.length;
+}
+
+function jumpToQuestion(index) {
+    saveCurrentAnswer();
+    if (!allowBackNav && index < currentIndex) {
+        toastWarning('Back navigation is disabled.');
+        return;
+    }
+    currentIndex = index;
+    renderQuestion();
+}
+
+function saveCurrentAnswer() {
+    const q = questions[currentIndex];
+    const type = q.question_type;
+    const textTypes = ['text_input', 'code_snippet', 'word_problem', 'mental_maths'];
+
+    if (textTypes.includes(type)) {
+        if (!answers[q.id]) answers[q.id] = {};
+        answers[q.id].text = document.getElementById('textAnswer').value;
+        if (answers[q.id].text) saveAnswer(q.id);
+    } else if (type === 'numeric') {
+        if (!answers[q.id]) answers[q.id] = {};
+        answers[q.id].text = document.getElementById('numericAnswer').value;
+        if (answers[q.id].text) saveAnswer(q.id);
+    } else if (type === 'fill_blank') {
+        if (!answers[q.id]) answers[q.id] = {};
+        answers[q.id].text = document.getElementById('fillBlankAnswer').value;
+        if (answers[q.id].text) saveAnswer(q.id);
+    }
+    // ordering, matching, likert save immediately on interaction
 }
 
 function selectOption(label) {
@@ -451,6 +833,7 @@ function selectOption(label) {
     const isMultiple = q.question_type === 'multiple_choice';
     
     if (!answers[q.id]) answers[q.id] = { options: [] };
+    if (!answers[q.id].options) answers[q.id].options = [];
     
     if (isMultiple) {
         const idx = answers[q.id].options.indexOf(label);
@@ -461,6 +844,7 @@ function selectOption(label) {
     }
     
     saveAnswer(q.id);
+    renderQuestion(); // Re-render for visual feedback
 }
 
 async function saveAnswer(questionId) {
@@ -475,6 +859,8 @@ async function saveAnswer(questionId) {
                 question_id: questionId,
                 selected_options: answer.options || null,
                 text_answer: answer.text || null,
+                ordering: answer.ordering || null,
+                matching: answer.matching || null,
             }),
         });
     } catch (err) {
@@ -483,13 +869,7 @@ async function saveAnswer(questionId) {
 }
 
 function nextQuestion() {
-    // Save text answer if applicable
-    const q = questions[currentIndex];
-    if (q.question_type === 'text_input') {
-        if (!answers[q.id]) answers[q.id] = {};
-        answers[q.id].text = document.getElementById('textAnswer').value;
-        saveAnswer(q.id);
-    }
+    saveCurrentAnswer();
     
     if (currentIndex < questions.length - 1) {
         currentIndex++;
@@ -501,6 +881,7 @@ function nextQuestion() {
 
 function prevQuestion() {
     if (allowBackNav && currentIndex > 0) {
+        saveCurrentAnswer();
         currentIndex--;
         renderQuestion();
     }
@@ -511,10 +892,16 @@ async function submitTest() {
     if (!confirmed) return;
     
     try {
+        // Stop webcam recording and upload
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            await stopAndUploadRecording();
+        }
+
         const res = await fetch(`/api/test/submit/${TOKEN}`, {method: 'POST'});
         const data = await res.json();
         
         clearInterval(timerInterval);
+        stopWebcam();
         hideAll();
         document.getElementById('completedState').classList.remove('hidden');
         
@@ -531,6 +918,59 @@ async function submitTest() {
     } catch (err) {
         toastError('Failed to submit. Please try again.');
     }
+}
+
+function stopWebcam() {
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+    }
+}
+
+async function stopAndUploadRecording() {
+    return new Promise((resolve) => {
+        mediaRecorder.onstop = async () => {
+            if (recordedChunks.length === 0) { resolve(); return; }
+
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+            recordedChunks = [];
+
+            try {
+                toastInfo('Uploading proctoring recording...');
+                const formData = new FormData();
+                formData.append('file', blob, `proctoring_${sessionId}.webm`);
+                formData.append('upload_preset', CLOUDINARY_PRESET);
+                formData.append('folder', 'quizly/proctoring');
+                formData.append('resource_type', 'video');
+
+                const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (uploadRes.ok) {
+                    const uploadData = await uploadRes.json();
+                    // Save to backend
+                    await fetch(`/api/test/recording/${TOKEN}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            recording_url: uploadData.secure_url,
+                            recording_id: uploadData.public_id,
+                        }),
+                    });
+                    console.log('Recording uploaded:', uploadData.secure_url);
+                } else {
+                    console.error('Cloudinary upload failed');
+                }
+            } catch (err) {
+                console.error('Recording upload error:', err);
+            }
+            resolve();
+        };
+
+        mediaRecorder.stop();
+    });
 }
 
 function startTimer() {

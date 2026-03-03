@@ -45,6 +45,11 @@ class CandidateResultMail extends Mailable
 
     public function attachments(): array
     {
+        // Only attach answers PDF if the assessment owner enabled it
+        if (!$this->assessment->send_answers_to_taker) {
+            return [];
+        }
+
         $this->assessment->load(['questions.options']);
         $this->session->load('answers');
 

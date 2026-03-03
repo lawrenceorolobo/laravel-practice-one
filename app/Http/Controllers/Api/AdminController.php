@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\Assessment;
+use App\Models\FeatureFlag;
 use App\Models\Payment;
 use App\Models\Setting;
 use App\Models\SubscriptionPlan;
@@ -255,6 +256,110 @@ class AdminController extends Controller
                 'total' => (float) $revenue->total,
                 'this_month' => (float) $revenue->this_month,
             ],
+        ]);
+    }
+
+    /**
+     * Dashboard analytics - monthly trends for charts
+     */
+    public function dashboardAnalytics(): JsonResponse
+    {
+        $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
+
+        // Build labels
+        $labels = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $labels[] = now()->subMonths($i)->format('M Y');
+        }
+
+        // Monthly user registrations — single GROUP BY query
+        $userRows = DB::select(
+            "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
+             FROM users WHERE created_at >= ? AND deleted_at IS NULL
+             GROUP BY month ORDER BY month",
+            [$sixMonthsAgo]
+        );
+        $userMap = collect($userRows)->pluck('cnt', 'month');
+
+        // Monthly assessments — single GROUP BY query
+        $assessmentRows = DB::select(
+            "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
+             FROM assessments WHERE created_at >= ?
+             GROUP BY month ORDER BY month",
+            [$sixMonthsAgo]
+        );
+        $assessmentMap = collect($assessmentRows)->pluck('cnt', 'month');
+
+        // Monthly revenue — single GROUP BY query
+        $revenueRows = DB::select(
+            "SELECT DATE_FORMAT(paid_at, '%Y-%m') as month, SUM(amount) as total
+             FROM payments WHERE status = 'success' AND paid_at >= ?
+             GROUP BY month ORDER BY month",
+            [$sixMonthsAgo]
+        );
+        $revenueMap = collect($revenueRows)->pluck('total', 'month');
+
+        // Fill arrays for 6 months
+        $userTrend = [];
+        $assessmentTrend = [];
+        $revenueTrend = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $key = now()->subMonths($i)->format('Y-m');
+            $userTrend[] = (int) ($userMap[$key] ?? 0);
+            $assessmentTrend[] = (int) ($assessmentMap[$key] ?? 0);
+            $revenueTrend[] = (float) ($revenueMap[$key] ?? 0);
+        }
+
+        // Test session stats from invitees table (aligned with reports)
+        $testStats = DB::selectOne("SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status = 'pending' OR status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as timed_out
+            FROM invitees");
+
+        // Average score from test_sessions
+        $avgScore = DB::selectOne("SELECT ROUND(AVG(percentage), 1) as avg
+            FROM test_sessions WHERE percentage IS NOT NULL");
+
+        // Plan distribution from payments + subscription_plans
+        $planDistribution = DB::select(
+            "SELECT sp.name as plan, COUNT(DISTINCT p.user_id) as count
+             FROM payments p
+             JOIN subscription_plans sp ON sp.id = p.plan_id
+             WHERE p.status = 'success'
+             GROUP BY sp.name
+             ORDER BY count DESC"
+        );
+
+        // Count users without any successful payment as 'Free'
+        $paidUserCount = (int) DB::selectOne(
+            "SELECT COUNT(DISTINCT user_id) as cnt FROM payments WHERE status = 'success'"
+        )->cnt;
+        $totalUsers = (int) DB::selectOne("SELECT COUNT(*) as cnt FROM users WHERE deleted_at IS NULL")->cnt;
+        $freeUsers = $totalUsers - $paidUserCount;
+
+        $plans = collect($planDistribution)->map(fn($p) => [
+            'plan' => $p->plan, 'count' => (int) $p->count
+        ])->values()->toArray();
+
+        if ($freeUsers > 0) {
+            array_unshift($plans, ['plan' => 'Free', 'count' => $freeUsers]);
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'users' => $userTrend,
+            'assessments' => $assessmentTrend,
+            'revenue' => $revenueTrend,
+            'test_sessions' => [
+                'total' => (int) ($testStats->total ?? 0),
+                'completed' => (int) ($testStats->completed ?? 0),
+                'in_progress' => (int) ($testStats->in_progress ?? 0),
+                'timed_out' => (int) ($testStats->timed_out ?? 0),
+                'avg_score' => (float) ($avgScore->avg ?? 0),
+            ],
+            'plan_distribution' => $plans,
         ]);
     }
 
@@ -581,5 +686,64 @@ class AdminController extends Controller
 
         return response()->json(['message' => 'Assessment deleted successfully.']);
     }
-}
 
+    // ========================================
+    // FEATURE FLAGS
+    // ========================================
+
+    /**
+     * List all feature flags grouped by category
+     */
+    public function featureFlags(): JsonResponse
+    {
+        $flags = FeatureFlag::orderBy('category')->orderBy('name')->get();
+        $grouped = $flags->groupBy('category');
+
+        return response()->json([
+            'flags' => $flags,
+            'grouped' => $grouped,
+            'categories' => $grouped->keys(),
+        ]);
+    }
+
+    /**
+     * Toggle a feature flag on/off
+     */
+    public function toggleFeatureFlag(Request $request, string $id): JsonResponse
+    {
+        $flag = FeatureFlag::findOrFail($id);
+        $flag->update(['enabled' => !$flag->enabled]);
+
+        logger()->info('Admin toggled feature flag', [
+            'admin_id' => $request->user()->id,
+            'flag' => $flag->key,
+            'enabled' => $flag->enabled,
+        ]);
+
+        return response()->json([
+            'message' => $flag->enabled ? "{$flag->name} enabled." : "{$flag->name} disabled.",
+            'flag' => $flag,
+        ]);
+    }
+
+    /**
+     * Update a feature flag
+     */
+    public function updateFeatureFlag(Request $request, string $id): JsonResponse
+    {
+        $flag = FeatureFlag::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:100',
+            'description' => 'nullable|string|max:500',
+            'enabled' => 'sometimes|boolean',
+        ]);
+
+        $flag->update($validated);
+
+        return response()->json([
+            'message' => 'Feature flag updated.',
+            'flag' => $flag->fresh(),
+        ]);
+    }
+}

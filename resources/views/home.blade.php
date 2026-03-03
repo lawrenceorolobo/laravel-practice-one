@@ -73,7 +73,7 @@
 </section>
 
 <!-- Logo Marquee -->
-<section class="py-16 bg-white border-y border-slate-100 overflow-hidden">
+<!-- <section class="py-16 bg-white border-y border-slate-100 overflow-hidden">
     <p class="text-center text-sm text-slate-400 uppercase tracking-widest mb-10">Trusted by leading organizations worldwide</p>
     <div class="relative">
         <div class="flex animate-marquee whitespace-nowrap">
@@ -99,7 +99,7 @@
             </div>
         </div>
     </div>
-</section>
+</section> -->
 
 <!-- Features Section -->
 <section id="features" class="py-32 bg-slate-50">
@@ -140,7 +140,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-bold text-slate-900 mb-3">Fraud Detection AI</h3>
-                    <p class="text-slate-500">Advanced algorithms detect cheating, tab-switching, and proxy test-taking in real-time.</p>
+                    <p class="text-slate-500">Advanced algorithms detect cheating and tab-switching</p>
                 </div>
             </div>
             
@@ -168,7 +168,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-bold text-slate-900 mb-3">Timed Assessments</h3>
-                    <p class="text-slate-500">Set custom time limits per question or entire assessment with auto-submit.</p>
+                    <p class="text-slate-500">Set custom time limits for an entire assessment with auto-submit.</p>
                 </div>
             </div>
             
@@ -196,7 +196,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-bold text-slate-900 mb-3">Export & Reports</h3>
-                    <p class="text-slate-500">Download detailed PDF reports and export results to CSV, Excel, or integrate via API.</p>
+                    <p class="text-slate-500">Download detailed PDF reports and export results to CSV, Excel.</p>
                 </div>
             </div>
         </div>
@@ -253,9 +253,6 @@
             <h2 class="text-4xl md:text-6xl font-black text-slate-900 mt-4 mb-6">
                 Simple, transparent pricing
             </h2>
-            <p class="text-xl text-slate-500 max-w-2xl mx-auto">
-                Start free, upgrade when you need more power.
-            </p>
         </div>
         
         <div id="pricingGrid" class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -363,17 +360,17 @@ loadPricingPlans();
             <span class="text-indigo-600">hiring process?</span>
         </h2>
         <p class="text-xl text-slate-500 mb-10 max-w-2xl mx-auto">
-            Join hundreds of companies already using Quizly. Start your free trial today.
+            Join hundreds of companies already using Quizly.
         </p>
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-1 transition-all">
-                Start Free Trial
+                Register Now
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
                 </svg>
             </a>
             <a href="#" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold text-lg hover:bg-slate-200 transition-all">
-                Schedule Demo
+                Contact Us
             </a>
         </div>
     </div>

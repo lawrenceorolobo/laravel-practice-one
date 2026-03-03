@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class FeatureFlag extends Model
+{
+    protected $fillable = ['key', 'name', 'description', 'category', 'enabled'];
+
+    protected function casts(): array
+    {
+        return ['enabled' => 'boolean'];
+    }
+
+    public static function isEnabled(string $key): bool
+    {
+        $flag = static::where('key', $key)->first();
+        return $flag ? $flag->enabled : false;
+    }
+}

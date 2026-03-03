@@ -31,6 +31,8 @@ class TestSession extends Model
         'screen_resolution',
         'fullscreen_exits',
         'tab_switches',
+        'webcam_recording_url',
+        'webcam_recording_id',
         'started_at',
         'submitted_at',
         'time_spent_seconds',

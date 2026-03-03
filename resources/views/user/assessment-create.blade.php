@@ -71,6 +71,10 @@
                     <input type="checkbox" name="shuffle_options" id="shuffleopts" class="w-5 h-5 rounded">
                     <label for="shuffleopts">Shuffle answer options</label>
                 </div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" name="send_answers_to_taker" id="sendanswers" class="w-5 h-5 rounded">
+                    <label for="sendanswers">Send detailed answers to candidates after test</label>
+                </div>
             </div>
         </div>
 
@@ -89,6 +93,10 @@
                 <div class="flex items-center gap-3">
                     <input type="checkbox" name="fullscreen_required" id="fullscreen" class="w-5 h-5 rounded">
                     <label for="fullscreen">Require fullscreen</label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" name="auto_end_on_leave" id="autoend" class="w-5 h-5 rounded">
+                    <label for="autoend">Auto-end test if candidate switches tab</label>
                 </div>
             </div>
         </div>
@@ -147,6 +155,8 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
         proctoring_enabled: form.proctoring_enabled.checked,
         webcam_required: form.webcam_required.checked,
         fullscreen_required: form.fullscreen_required.checked,
+        auto_end_on_leave: form.auto_end_on_leave.checked,
+        send_answers_to_taker: form.send_answers_to_taker.checked,
     };
     
     try {

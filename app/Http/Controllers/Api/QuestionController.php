@@ -20,18 +20,24 @@ class QuestionController extends Controller
     {
         $assessment = $this->getEditableAssessment($request, $assessmentId);
 
+        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem';
+        $noOptionTypes = ['text_input', 'fill_blank', 'numeric', 'mental_maths', 'word_problem', 'code_snippet'];
+
         $validated = $request->validate([
             'question_text' => ['required', 'string', 'max:2000'],
-            'question_type' => ['required', 'in:single_choice,multiple_choice,text_input'],
+            'question_type' => ['required', "in:{$allTypes}"],
+            'question_metadata' => ['nullable', 'array'],
             'points' => ['integer', 'min:1', 'max:100'],
-            'expected_answer' => ['nullable', 'required_if:question_type,text_input', 'string', 'max:1000'],
-            'options' => ['required_unless:question_type,text_input', 'array', 'min:2', 'max:10'],
+            'expected_answer' => ['nullable', 'string', 'max:1000'],
+            'options' => [in_array($request->question_type, $noOptionTypes) ? 'nullable' : 'required', 'array', 'min:2', 'max:10'],
             'options.*.text' => ['required', 'string', 'max:500'],
             'options.*.is_correct' => ['required', 'boolean'],
+            'options.*.media_url' => ['nullable', 'string', 'max:500'],
+            'options.*.media_type' => ['nullable', 'string', 'max:50'],
         ]);
 
-        // Validate at least one correct option for MCQ
-        if ($validated['question_type'] !== 'text_input') {
+        // Validate at least one correct option for choice types
+        if (!in_array($validated['question_type'], $noOptionTypes) && !empty($validated['options'])) {
             $correctCount = collect($validated['options'])->where('is_correct', true)->count();
             
             if ($correctCount === 0) {
@@ -54,19 +60,22 @@ class QuestionController extends Controller
                 'assessment_id' => $assessment->id,
                 'question_text' => $validated['question_text'],
                 'question_type' => $validated['question_type'],
+                'question_metadata' => $validated['question_metadata'] ?? null,
                 'expected_answer' => $validated['expected_answer'] ?? null,
                 'points' => $validated['points'] ?? 1,
                 'question_order' => $maxOrder + 1,
             ]);
 
-            if ($validated['question_type'] !== 'text_input' && !empty($validated['options'])) {
+            if (!in_array($validated['question_type'], $noOptionTypes) && !empty($validated['options'])) {
                 foreach ($validated['options'] as $index => $option) {
                     QuestionOption::create([
                         'question_id' => $question->id,
                         'option_text' => $option['text'],
-                        'option_label' => chr(65 + $index), // A, B, C, D...
+                        'option_label' => chr(65 + $index),
                         'is_correct' => $option['is_correct'],
                         'option_order' => $index + 1,
+                        'media_url' => $option['media_url'] ?? null,
+                        'media_type' => $option['media_type'] ?? null,
                     ]);
                 }
             }
@@ -91,14 +100,19 @@ class QuestionController extends Controller
             ->where('assessment_id', $assessment->id)
             ->firstOrFail();
 
+        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem';
+
         $validated = $request->validate([
             'question_text' => ['sometimes', 'string', 'max:2000'],
-            'question_type' => ['sometimes', 'in:single_choice,multiple_choice,text_input'],
+            'question_type' => ['sometimes', "in:{$allTypes}"],
+            'question_metadata' => ['nullable', 'array'],
             'points' => ['integer', 'min:1', 'max:100'],
             'expected_answer' => ['nullable', 'string', 'max:2000'],
             'options' => ['sometimes', 'array', 'min:2', 'max:10'],
             'options.*.text' => ['required_with:options', 'string', 'max:500'],
             'options.*.is_correct' => ['required_with:options', 'boolean'],
+            'options.*.media_url' => ['nullable', 'string', 'max:500'],
+            'options.*.media_type' => ['nullable', 'string', 'max:50'],
         ]);
 
         return DB::transaction(function () use ($question, $validated) {

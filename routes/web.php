@@ -82,3 +82,4 @@ Route::view('/admin/subscription-plans', 'admin.subscription-plans')->name('admi
 Route::view('/admin/assessments', 'admin.assessments')->name('admin.assessments');
 Route::view('/admin/reports', 'admin.reports')->name('admin.reports');
 Route::view('/admin/settings', 'admin.settings')->name('admin.settings');
+Route::view('/admin/feature-flags', 'admin.feature-flags')->name('admin.feature-flags');

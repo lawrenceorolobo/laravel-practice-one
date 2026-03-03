@@ -1,364 +1,120 @@
 @extends('layouts.admin')
-
 @section('title', 'Subscription Plans | Admin')
 @section('page-title', 'Subscription Plans')
 
 @section('header-actions')
-<button onclick="openCreateModal()" class="px-3 lg:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium text-xs lg:text-sm transition-colors flex items-center gap-2">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
+<button onclick="openCreateModal()" class="btn-primary flex items-center gap-2">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
     <span class="hidden sm:inline">Add Plan</span>
 </button>
 @endsection
 
 @section('content')
-<!-- Plans Grid with Skeleton Loading -->
-<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6" id="plansGrid">
-    <!-- Skeleton Card 1 -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 lg:p-6 border-b border-slate-700">
-            <div class="flex items-center justify-between mb-3">
-                <div class="skeleton skeleton-glass h-6 w-28 rounded"></div>
-                <div class="skeleton skeleton-glass h-5 w-14 rounded-full"></div>
-            </div>
-            <div class="skeleton skeleton-glass h-9 w-32 rounded mb-2"></div>
-            <div class="skeleton skeleton-glass h-4 w-16 rounded"></div>
+<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4" id="plansGrid">
+    <div class="panel overflow-hidden" style="border-top:3px solid #6366f1;">
+        <div class="p-4 lg:p-5" style="border-bottom:1px solid var(--border);">
+            <div class="flex items-center justify-between mb-2.5"><div class="skel h-4 w-24"></div><div class="skel skel-pill h-5 w-12"></div></div>
+            <div class="skel h-7 w-28 mb-1.5"></div><div class="skel h-3 w-14"></div>
         </div>
-        <div class="p-4 lg:p-6">
-            <ul class="space-y-3 mb-6">
-                <li class="flex items-center gap-2"><div class="skeleton skeleton-glass h-4 w-4 rounded-full"></div><div class="skeleton skeleton-glass h-4 w-28 rounded"></div></li>
-                <li class="flex items-center gap-2"><div class="skeleton skeleton-glass h-4 w-4 rounded-full"></div><div class="skeleton skeleton-glass h-4 w-36 rounded"></div></li>
-                <li class="flex items-center gap-2"><div class="skeleton skeleton-glass h-4 w-4 rounded-full"></div><div class="skeleton skeleton-glass h-4 w-24 rounded"></div></li>
-            </ul>
-            <div class="flex gap-2">
-                <div class="skeleton skeleton-glass h-10 flex-1 rounded-lg"></div>
-                <div class="skeleton skeleton-glass h-10 w-16 rounded-lg"></div>
-            </div>
+        <div class="p-4 lg:p-5">
+            <ul class="space-y-2.5 mb-4"><li class="flex items-center gap-2"><div class="skel skel-circle h-3.5 w-3.5"></div><div class="skel h-3 w-24"></div></li><li class="flex items-center gap-2"><div class="skel skel-circle h-3.5 w-3.5"></div><div class="skel h-3 w-32"></div></li><li class="flex items-center gap-2"><div class="skel skel-circle h-3.5 w-3.5"></div><div class="skel h-3 w-20"></div></li></ul>
+            <div class="flex gap-2"><div class="skel h-8 flex-1 rounded-lg"></div><div class="skel h-8 w-14 rounded-lg"></div></div>
         </div>
     </div>
-    <!-- Skeleton Card 2 -->
-    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div class="p-4 lg:p-6 border-b border-slate-700">
-            <div class="flex items-center justify-between mb-3">
-                <div class="skeleton skeleton-glass h-6 w-24 rounded"></div>
-                <div class="skeleton skeleton-glass h-5 w-16 rounded-full"></div>
-            </div>
-            <div class="skeleton skeleton-glass h-9 w-36 rounded mb-2"></div>
-            <div class="skeleton skeleton-glass h-4 w-14 rounded"></div>
+    <div class="panel overflow-hidden" style="border-top:3px solid #10b981;">
+        <div class="p-4 lg:p-5" style="border-bottom:1px solid var(--border);">
+            <div class="flex items-center justify-between mb-2.5"><div class="skel h-4 w-20"></div><div class="skel skel-pill h-5 w-14"></div></div>
+            <div class="skel h-7 w-32 mb-1.5"></div><div class="skel h-3 w-12"></div>
         </div>
-        <div class="p-4 lg:p-6">
-            <ul class="space-y-3 mb-6">
-                <li class="flex items-center gap-2"><div class="skeleton skeleton-glass h-4 w-4 rounded-full"></div><div class="skeleton skeleton-glass h-4 w-32 rounded"></div></li>
-                <li class="flex items-center gap-2"><div class="skeleton skeleton-glass h-4 w-4 rounded-full"></div><div class="skeleton skeleton-glass h-4 w-28 rounded"></div></li>
-            </ul>
-            <div class="flex gap-2">
-                <div class="skeleton skeleton-glass h-10 flex-1 rounded-lg"></div>
-                <div class="skeleton skeleton-glass h-10 w-16 rounded-lg"></div>
-            </div>
+        <div class="p-4 lg:p-5">
+            <ul class="space-y-2.5 mb-4"><li class="flex items-center gap-2"><div class="skel skel-circle h-3.5 w-3.5"></div><div class="skel h-3 w-28"></div></li><li class="flex items-center gap-2"><div class="skel skel-circle h-3.5 w-3.5"></div><div class="skel h-3 w-24"></div></li></ul>
+            <div class="flex gap-2"><div class="skel h-8 flex-1 rounded-lg"></div><div class="skel h-8 w-14 rounded-lg"></div></div>
         </div>
     </div>
 </div>
 
 <!-- Create/Edit Modal -->
-<div id="planModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div class="p-4 lg:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800">
-            <h3 class="text-base lg:text-lg font-bold" id="modalTitle">Add Plan</h3>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
+<div id="planModal" class="fixed inset-0 hidden items-center justify-center z-50 p-4" style="background:var(--overlay);backdrop-filter:blur(8px);">
+    <div class="panel w-full max-w-md max-h-[90vh] overflow-y-auto" style="box-shadow:var(--shadow-lg);">
+        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom:1px solid var(--border);">
+            <h3 class="text-[14px] font-semibold" style="color:var(--text-primary);" id="modalTitle">Add Plan</h3>
+            <button onclick="closeModal()" class="p-1 rounded-lg transition" style="color:var(--text-muted);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='transparent'"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
-        <form id="planForm" class="p-4 lg:p-6 space-y-4">
+        <form id="planForm" class="p-5 space-y-4">
             <input type="hidden" id="planId">
             <div>
-                <label class="block text-xs lg:text-sm font-medium text-slate-400 mb-1">Plan Name</label>
-                <input type="text" id="planName" required placeholder="e.g., Professional" class="w-full px-3 lg:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <label class="block text-[11px] font-medium mb-1.5" style="color:var(--text-secondary);">Plan Name</label>
+                <input type="text" id="planName" required placeholder="e.g., Professional" class="w-full">
             </div>
-            <div class="grid grid-cols-2 gap-3 lg:gap-4">
-                <div>
-                    <label class="block text-xs lg:text-sm font-medium text-slate-400 mb-1">Monthly Price (₦)</label>
-                    <input type="number" id="planMonthlyPrice" required min="0" step="100" class="w-full px-3 lg:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-xs lg:text-sm font-medium text-slate-400 mb-1">Annual Discount (%)</label>
-                    <input type="number" id="planAnnualDiscount" min="0" max="100" step="1" value="15" class="w-full px-3 lg:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-[11px] font-medium mb-1.5" style="color:var(--text-secondary);">Monthly Price (₦)</label><input type="number" id="planMonthlyPrice" required min="0" step="100" class="w-full"></div>
+                <div><label class="block text-[11px] font-medium mb-1.5" style="color:var(--text-secondary);">Annual Discount (%)</label><input type="number" id="planAnnualDiscount" min="0" max="100" step="1" value="15" class="w-full"></div>
             </div>
             <div>
-                <label class="block text-xs lg:text-sm font-medium text-slate-400 mb-2">Features (one per line)</label>
-                <textarea id="planFeatures" rows="5" placeholder="Unlimited assessments&#10;Priority support&#10;Custom branding&#10;Export results" class="w-full px-3 lg:px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                <label class="block text-[11px] font-medium mb-1.5" style="color:var(--text-secondary);">Features (one per line)</label>
+                <textarea id="planFeatures" rows="4" placeholder="Unlimited assessments&#10;Priority support&#10;Custom branding" class="w-full"></textarea>
             </div>
-            <div class="flex items-center gap-2">
-                <input type="checkbox" id="planActive" checked class="w-4 h-4 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500">
-                <label for="planActive" class="text-xs lg:text-sm text-slate-300">Active</label>
+            <div class="flex items-center gap-3">
+                <label class="toggle-switch"><input type="checkbox" id="planActive" checked><span class="slider"></span></label>
+                <label for="planActive" class="text-[12px] cursor-pointer" style="color:var(--text-secondary);">Active</label>
             </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium text-sm transition-colors">Cancel</button>
-                <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium text-sm transition-colors">Save Plan</button>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal()" class="btn-ghost flex-1">Cancel</button>
+                <button type="submit" class="btn-primary flex-1">Save Plan</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Plan Preview Modal -->
-<div id="planPreviewModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4" onclick="if(event.target === this) closePlanPreview()">
-    <div class="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md">
-        <div class="p-4 lg:p-6 border-b border-slate-700 flex items-center justify-between">
-            <h3 class="text-base lg:text-lg font-bold" id="previewTitle">Plan Details</h3>
-            <button onclick="closePlanPreview()" class="text-slate-400 hover:text-white p-1">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
+<div id="planPreviewModal" class="fixed inset-0 hidden items-center justify-center z-50 p-4" style="background:var(--overlay);backdrop-filter:blur(8px);" onclick="if(event.target===this) closePlanPreview()">
+    <div class="panel w-full max-w-sm" style="box-shadow:var(--shadow-lg);">
+        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom:1px solid var(--border);">
+            <h3 class="text-[14px] font-semibold" style="color:var(--text-primary);" id="previewTitle">Plan Details</h3>
+            <button onclick="closePlanPreview()" class="p-1 rounded-lg transition" style="color:var(--text-muted);" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='transparent'"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
-        <div class="p-4 lg:p-6 space-y-4" id="previewBody"></div>
+        <div class="p-5 space-y-3" id="previewBody"></div>
     </div>
 </div>
 @endsection
 
 @section('scripts')
 <script>
-    const token = localStorage.getItem('adminToken');
-    let allPlans = [];
+const token=localStorage.getItem('adminToken');let allPlans=[];
+const planAccents=['#6366f1','#10b981','#a855f7','#f59e0b','#ef4444','#06b6d4'];
 
-    async function loadPlans() {
-        try {
-            const res = await fetch('/api/admin/subscription-plans', {
-                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-            });
-            if (res.status === 401) {
-                localStorage.removeItem('adminToken');
-                window.location.href = '/admin/login';
-                return;
-            }
-            const data = await res.json();
-            allPlans = data.data || data.plans || [];
-            renderPlans();
-        } catch (err) {
-            console.error('Failed to load plans:', err);
-            renderPlans();
-        }
-    }
+async function loadPlans(){try{const r=await fetch('/api/admin/subscription-plans',{headers:{'Authorization':`Bearer ${token}`,'Accept':'application/json'}});if(r.status===401){localStorage.removeItem('adminToken');window.location.href='/admin/login';return}const d=await r.json();allPlans=d.data||d.plans||[];renderPlans()}catch(e){renderPlans()}}
 
-    function renderPlans() {
-        const grid = document.getElementById('plansGrid');
-        
-        if (allPlans.length === 0) {
-            grid.innerHTML = `
-                <div class="sm:col-span-2 lg:col-span-3 bg-slate-800 rounded-xl border border-slate-700 p-8 lg:p-12 text-center">
-                    <svg class="w-12 h-12 lg:w-16 lg:h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                    </svg>
-                    <p class="text-slate-400 mb-4 text-sm lg:text-base">No subscription plans yet</p>
-                    <button onclick="openCreateModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium text-sm transition-colors">
-                        Create First Plan
-                    </button>
-                </div>
-            `;
-            return;
-        }
+function renderPlans(){const g=document.getElementById('plansGrid');if(!allPlans.length){g.innerHTML=`<div class="sm:col-span-2 lg:col-span-3 panel p-8 lg:p-10 text-center"><svg class="w-10 h-10 mx-auto mb-3" style="color:var(--text-faint)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg><p class="text-[12px] mb-3" style="color:var(--text-muted)">No subscription plans yet</p><button onclick="openCreateModal()" class="btn-primary">Create First Plan</button></div>`;return}
+g.innerHTML=allPlans.map((p,i)=>{const f=p.features?(typeof p.features==='string'?JSON.parse(p.features):p.features):[];const mp=Number(p.monthly_price||0),ad=Number(p.annual_discount_percent||0),ap=Math.round(mp*12*(1-ad/100)),ac=planAccents[i%planAccents.length];
+return `<div class="panel overflow-hidden ${!p.is_active?'opacity-50':''}" style="border-top:3px solid ${ac};">
+<div class="p-4 lg:p-5" style="border-bottom:1px solid var(--border);">
+<div class="flex items-center justify-between mb-1.5"><h3 class="text-[15px] font-bold truncate" style="color:var(--text-primary)">${p.name}</h3><span class="badge ${p.is_active?'badge-success':'badge-danger'} ml-2 flex-shrink-0">${p.is_active?'Active':'Off'}</span></div>
+<p class="text-xl font-bold" style="color:${ac}">₦${mp.toLocaleString()}<span class="text-[11px] font-normal" style="color:var(--text-muted)">/mo</span></p>
+${ad>0?`<p class="text-[11px] mt-0.5" style="color:#34d399">${ad}% off annually → ₦${ap.toLocaleString()}/yr</p>`:''}
+${p.users_count!==undefined?`<p class="text-[10px] mt-0.5" style="color:var(--text-muted)">${p.users_count} subscriber${p.users_count!==1?'s':''}</p>`:''}</div>
+<div class="p-4 lg:p-5"><ul class="space-y-1.5 mb-4">${f.map(ft=>`<li class="flex items-center gap-2 text-[12px]" style="color:var(--text-secondary)"><svg class="w-3.5 h-3.5 flex-shrink-0" style="color:#34d399" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="truncate">${ft}</span></li>`).join('')}</ul>
+<div class="flex gap-2"><button onclick="previewPlan('${p.id}')" class="btn-ghost flex-1 text-[12px] py-1.5">View</button><button onclick="editPlan('${p.id}')" class="btn-primary flex-1 text-[12px] py-1.5">Edit</button><button onclick="deletePlan('${p.id}')" class="p-1.5 rounded-lg hover:bg-red-500/10 transition" title="Delete"><svg class="w-3.5 h-3.5" style="color:#f87171" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div></div></div>`}).join('')}
 
-        grid.innerHTML = allPlans.map(plan => {
-            const features = plan.features ? (typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features) : [];
-            const monthlyPrice = Number(plan.monthly_price || 0);
-            const annualDiscount = Number(plan.annual_discount_percent || 0);
-            const annualPrice = Math.round(monthlyPrice * 12 * (1 - annualDiscount / 100));
-            
-            return `
-                <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden ${!plan.is_active ? 'opacity-60' : ''}">
-                    <div class="p-4 lg:p-6 border-b border-slate-700">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="text-lg lg:text-xl font-bold truncate">${plan.name}</h3>
-                            <span class="px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ml-2 ${plan.is_active ? 'bg-emerald-600/20 text-emerald-400' : 'bg-red-600/20 text-red-400'}">
-                                ${plan.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                        </div>
-                        <p class="text-2xl lg:text-3xl font-bold text-indigo-400">₦${monthlyPrice.toLocaleString()}<span class="text-sm font-normal text-slate-400">/mo</span></p>
-                        ${annualDiscount > 0 ? `<p class="text-xs text-emerald-400 mt-1">${annualDiscount}% off annually → ₦${annualPrice.toLocaleString()}/yr</p>` : ''}
-                        ${plan.users_count !== undefined ? `<p class="text-xs text-slate-500 mt-1">${plan.users_count} active subscriber${plan.users_count !== 1 ? 's' : ''}</p>` : ''}
-                    </div>
-                    <div class="p-4 lg:p-6">
-                        <ul class="space-y-2 mb-4 lg:mb-6">
-                            ${features.map(f => `
-                                <li class="flex items-center gap-2 text-xs lg:text-sm text-slate-300">
-                                    <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                    </svg>
-                                    <span class="truncate">${f}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
-                        <div class="flex gap-2">
-                            <button onclick="previewPlan('${plan.id}')" class="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs lg:text-sm font-medium transition-colors">View</button>
-                            <button onclick="editPlan('${plan.id}')" class="flex-1 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 rounded-lg text-xs lg:text-sm font-medium transition-colors">Edit</button>
-                            <button onclick="deletePlan('${plan.id}')" class="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-xs lg:text-sm font-medium transition-colors">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
+function openCreateModal(){document.getElementById('modalTitle').textContent='Add Plan';document.getElementById('planForm').reset();document.getElementById('planId').value='';document.getElementById('planAnnualDiscount').value='15';document.getElementById('planActive').checked=true;document.getElementById('planModal').classList.remove('hidden');document.getElementById('planModal').classList.add('flex')}
 
-    function openCreateModal() {
-        document.getElementById('modalTitle').textContent = 'Add Plan';
-        document.getElementById('planForm').reset();
-        document.getElementById('planId').value = '';
-        document.getElementById('planAnnualDiscount').value = '15';
-        document.getElementById('planActive').checked = true;
-        document.getElementById('planModal').classList.remove('hidden');
-        document.getElementById('planModal').classList.add('flex');
-    }
+function editPlan(id){const p=allPlans.find(x=>x.id===id);if(!p)return;document.getElementById('modalTitle').textContent='Edit Plan';document.getElementById('planId').value=p.id;document.getElementById('planName').value=p.name;document.getElementById('planMonthlyPrice').value=p.monthly_price;document.getElementById('planAnnualDiscount').value=p.annual_discount_percent||15;document.getElementById('planActive').checked=p.is_active;const f=p.features?(typeof p.features==='string'?JSON.parse(p.features):p.features):[];document.getElementById('planFeatures').value=f.join('\n');document.getElementById('planModal').classList.remove('hidden');document.getElementById('planModal').classList.add('flex')}
 
-    function editPlan(id) {
-        const plan = allPlans.find(p => p.id === id);
-        if (!plan) return;
+function closeModal(){document.getElementById('planModal').classList.add('hidden');document.getElementById('planModal').classList.remove('flex')}
 
-        document.getElementById('modalTitle').textContent = 'Edit Plan';
-        document.getElementById('planId').value = plan.id;
-        document.getElementById('planName').value = plan.name;
-        document.getElementById('planMonthlyPrice').value = plan.monthly_price;
-        document.getElementById('planAnnualDiscount').value = plan.annual_discount_percent || 15;
-        document.getElementById('planActive').checked = plan.is_active;
-        
-        const features = plan.features ? (typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features) : [];
-        document.getElementById('planFeatures').value = features.join('\n');
-        
-        document.getElementById('planModal').classList.remove('hidden');
-        document.getElementById('planModal').classList.add('flex');
-    }
+async function deletePlan(id){const c=await showConfirm('Delete Plan','Are you sure you want to delete this plan?','Delete','danger');if(!c)return;try{const r=await fetch(`/api/admin/subscription-plans/${id}`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`,'Accept':'application/json'}});const d=await r.json();if(!r.ok){toastError(d.message||'Failed');return}toastSuccess('Plan deleted');loadPlans()}catch(e){toastError('Failed to delete plan')}}
 
-    function closeModal() {
-        document.getElementById('planModal').classList.add('hidden');
-        document.getElementById('planModal').classList.remove('flex');
-    }
+document.getElementById('planForm').addEventListener('submit',async(e)=>{e.preventDefault();const id=document.getElementById('planId').value;const ft=document.getElementById('planFeatures').value.split('\n').map(f=>f.trim()).filter(f=>f);const d={name:document.getElementById('planName').value,monthly_price:parseFloat(document.getElementById('planMonthlyPrice').value),annual_discount_percent:parseFloat(document.getElementById('planAnnualDiscount').value||15),features:ft,is_active:document.getElementById('planActive').checked};
+try{const r=await fetch(id?`/api/admin/subscription-plans/${id}`:'/api/admin/subscription-plans',{method:id?'PUT':'POST',headers:{'Authorization':`Bearer ${token}`,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(d)});const res=await r.json();if(!r.ok){toastError(res.message||'Failed');return}toastSuccess(id?'Plan updated':'Plan created');closeModal();loadPlans()}catch(e){toastError('Failed to save plan')}});
 
-    async function deletePlan(id) {
-        const confirmed = await showConfirm('Delete Plan', 'Are you sure you want to delete this subscription plan?', 'Delete', 'danger');
-        if (!confirmed) return;
-        try {
-            const res = await fetch(`/api/admin/subscription-plans/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                toastError(data.message || 'Failed to delete plan');
-                return;
-            }
-            toastSuccess('Plan deleted successfully');
-            loadPlans();
-        } catch (err) {
-            toastError('Failed to delete plan');
-        }
-    }
+function previewPlan(id){const p=allPlans.find(x=>x.id===id);if(!p)return;const f=p.features?(typeof p.features==='string'?JSON.parse(p.features):p.features):[];const mp=Number(p.monthly_price||0),ad=Number(p.annual_discount_percent||0),ap=Math.round(mp*12*(1-ad/100));
+document.getElementById('previewTitle').textContent=p.name;
+document.getElementById('previewBody').innerHTML=`<div class="inner-card space-y-2"><div class="flex justify-between"><span class="text-[11px]" style="color:var(--text-muted)">Status</span><span class="badge ${p.is_active?'badge-success':'badge-danger'}">${p.is_active?'Active':'Inactive'}</span></div><div class="flex justify-between"><span class="text-[11px]" style="color:var(--text-muted)">Monthly</span><span class="text-[13px] font-bold" style="color:#818cf8">₦${mp.toLocaleString()}</span></div>${ad>0?`<div class="flex justify-between"><span class="text-[11px]" style="color:var(--text-muted)">Annual</span><span class="text-[12px]" style="color:#34d399">${ad}% off → ₦${ap.toLocaleString()}/yr</span></div>`:''}${p.users_count!==undefined?`<div class="flex justify-between"><span class="text-[11px]" style="color:var(--text-muted)">Subscribers</span><span class="text-[12px]" style="color:var(--text-primary)">${p.users_count}</span></div>`:''}</div>
+<div><p class="text-[11px] mb-2" style="color:var(--text-muted)">Features</p>${f.length>0?`<ul class="space-y-1.5">${f.map(ft=>`<li class="flex items-center gap-2 text-[12px]" style="color:var(--text-secondary)"><svg class="w-3.5 h-3.5 flex-shrink-0" style="color:#34d399" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>${ft}</li>`).join('')}</ul>`:'<p class="text-[12px] italic" style="color:var(--text-muted)">No features listed</p>'}</div>
+<div class="flex gap-2 pt-2"><button onclick="closePlanPreview();editPlan('${p.id}')" class="btn-primary flex-1 text-[12px]">Edit</button><button onclick="closePlanPreview();deletePlan('${p.id}')" class="btn-ghost flex-1 text-[12px]" style="color:#f87171;">Delete</button></div>`;
+document.getElementById('planPreviewModal').classList.remove('hidden');document.getElementById('planPreviewModal').classList.add('flex')}
 
-    document.getElementById('planForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('planId').value;
-        const featuresText = document.getElementById('planFeatures').value;
-        const features = featuresText.split('\n').map(f => f.trim()).filter(f => f);
-        
-        const data = {
-            name: document.getElementById('planName').value,
-            monthly_price: parseFloat(document.getElementById('planMonthlyPrice').value),
-            annual_discount_percent: parseFloat(document.getElementById('planAnnualDiscount').value || 15),
-            features: features,
-            is_active: document.getElementById('planActive').checked
-        };
-
-        try {
-            const res = await fetch(id ? `/api/admin/subscription-plans/${id}` : '/api/admin/subscription-plans', {
-                method: id ? 'PUT' : 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            const result = await res.json();
-            if (!res.ok) {
-                toastError(result.message || 'Failed to save plan');
-                return;
-            }
-            toastSuccess(id ? 'Plan updated successfully' : 'Plan created successfully');
-            closeModal();
-            loadPlans();
-        } catch (err) {
-            toastError('Failed to save plan');
-        }
-    });
-
-    function previewPlan(id) {
-        const plan = allPlans.find(p => p.id === id);
-        if (!plan) return;
-
-        const features = plan.features ? (typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features) : [];
-        const monthlyPrice = Number(plan.monthly_price || 0);
-        const annualDiscount = Number(plan.annual_discount_percent || 0);
-        const annualPrice = Math.round(monthlyPrice * 12 * (1 - annualDiscount / 100));
-
-        document.getElementById('previewTitle').textContent = plan.name;
-        document.getElementById('previewBody').innerHTML = `
-            <div class="space-y-3">
-                <div class="flex justify-between items-center">
-                    <span class="text-sm text-slate-400">Status</span>
-                    <span class="px-2 py-1 rounded-full text-xs font-medium ${plan.is_active ? 'bg-emerald-600/20 text-emerald-400' : 'bg-red-600/20 text-red-400'}">
-                        ${plan.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-slate-400">Monthly Price</span>
-                    <span class="text-lg font-bold text-indigo-400">₦${monthlyPrice.toLocaleString()}</span>
-                </div>
-                ${annualDiscount > 0 ? `
-                <div class="flex justify-between">
-                    <span class="text-sm text-slate-400">Annual Discount</span>
-                    <span class="text-sm text-emerald-400">${annualDiscount}% off</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-sm text-slate-400">Annual Price</span>
-                    <span class="text-sm font-medium">₦${annualPrice.toLocaleString()}/yr</span>
-                </div>` : ''}
-                ${plan.users_count !== undefined ? `
-                <div class="flex justify-between">
-                    <span class="text-sm text-slate-400">Active Subscribers</span>
-                    <span class="text-sm font-medium">${plan.users_count}</span>
-                </div>` : ''}
-                <hr class="border-slate-700">
-                <div>
-                    <p class="text-sm text-slate-400 mb-2">Features</p>
-                    ${features.length > 0 ? `<ul class="space-y-2">
-                        ${features.map(f => `
-                            <li class="flex items-center gap-2 text-sm text-slate-300">
-                                <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                ${f}
-                            </li>
-                        `).join('')}
-                    </ul>` : '<p class="text-sm text-slate-500 italic">No features listed</p>'}
-                </div>
-                <hr class="border-slate-700">
-                <div class="flex gap-2 pt-2">
-                    <button onclick="closePlanPreview(); editPlan('${plan.id}')" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium text-sm transition-colors">Edit Plan</button>
-                    <button onclick="closePlanPreview(); deletePlan('${plan.id}')" class="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg font-medium text-sm transition-colors">Delete</button>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('planPreviewModal').classList.remove('hidden');
-        document.getElementById('planPreviewModal').classList.add('flex');
-    }
-
-    function closePlanPreview() {
-        document.getElementById('planPreviewModal').classList.add('hidden');
-        document.getElementById('planPreviewModal').classList.remove('flex');
-    }
-
-    loadPlans();
+function closePlanPreview(){document.getElementById('planPreviewModal').classList.add('hidden');document.getElementById('planPreviewModal').classList.remove('flex')}
+loadPlans();
 </script>
 @endsection

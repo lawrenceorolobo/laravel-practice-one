@@ -48,6 +48,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::post('/answer/{token}', [TestController::class, 'submitAnswer']);
         Route::post('/submit/{token}', [TestController::class, 'submit']);
         Route::post('/proctoring/{token}', [TestController::class, 'logProctoringEvent']);
+        Route::post('/recording/{token}', [TestController::class, 'saveRecording']);
 
         // Public access link (anyone with code can join)
         Route::get('/access/{accessCode}', [TestController::class, 'validateAccessCode']);
@@ -128,6 +129,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::get('/auth/me', [AdminAuthController::class, 'me']);
 
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
+        Route::get('/dashboard/analytics', [AdminController::class, 'dashboardAnalytics']);
         Route::get('/revenue', [AdminController::class, 'revenue']);
         Route::get('/settings', [AdminController::class, 'settings']);
         Route::put('/settings', [AdminController::class, 'updateSettings']);
@@ -151,5 +153,10 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::get('/assessments', [AdminController::class, 'assessments']);
         Route::get('/assessments/{id}', [AdminController::class, 'showAssessment']);
         Route::delete('/assessments/{id}', [AdminController::class, 'deleteAssessment']);
+
+        // Feature Flags
+        Route::get('/feature-flags', [AdminController::class, 'featureFlags']);
+        Route::post('/feature-flags/{id}/toggle', [AdminController::class, 'toggleFeatureFlag']);
+        Route::put('/feature-flags/{id}', [AdminController::class, 'updateFeatureFlag']);
     });
 });

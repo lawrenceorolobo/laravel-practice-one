@@ -16,6 +16,8 @@ class QuestionOption extends Model
         'option_label',
         'is_correct',
         'option_order',
+        'media_url',
+        'media_type',
     ];
 
     protected function casts(): array

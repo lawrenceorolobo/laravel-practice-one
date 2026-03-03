@@ -273,6 +273,9 @@ class TestController extends Controller
             'selected_options' => ['nullable', 'array'],
             'selected_options.*' => ['string', 'size:1'],
             'text_answer' => ['nullable', 'string', 'max:5000'],
+            'ordering' => ['nullable', 'array'],
+            'ordering.*' => ['string'],
+            'matching' => ['nullable', 'array'],
         ]);
 
         $invitee = Invitee::where('invite_token', $token)
@@ -297,6 +300,20 @@ class TestController extends Controller
             ]);
         }
 
+        // Store ordering/matching via existing columns
+        $selectedOptions = $validated['selected_options'] ?? null;
+        $textAnswer = $validated['text_answer'] ?? null;
+
+        // Ordering: store as JSON array in selected_options
+        if (!empty($validated['ordering'])) {
+            $selectedOptions = $validated['ordering'];
+        }
+
+        // Matching: store as JSON string in text_answer
+        if (!empty($validated['matching'])) {
+            $textAnswer = json_encode($validated['matching']);
+        }
+
         // Use idempotent upsert
         $answer = TestAnswer::updateOrCreate(
             [
@@ -304,8 +321,8 @@ class TestController extends Controller
                 'question_id' => $validated['question_id'],
             ],
             [
-                'selected_options' => $validated['selected_options'] ?? null,
-                'text_answer' => $validated['text_answer'] ?? null,
+                'selected_options' => $selectedOptions,
+                'text_answer' => $textAnswer,
                 'answered_at' => now(),
             ]
         );
@@ -517,5 +534,29 @@ class TestController extends Controller
             'message' => 'Successfully registered for assessment.',
             'redirect_token' => $invitee->invite_token,
         ], 201);
+    }
+
+    /**
+     * Save webcam recording URL from Cloudinary upload
+     */
+    public function saveRecording(Request $request, string $token): JsonResponse
+    {
+        $invitee = Invitee::where('invite_token', $token)->firstOrFail();
+        $session = TestSession::where('invitee_id', $invitee->id)
+            ->where('status', 'in_progress')
+            ->latest()
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'recording_url' => ['required', 'url', 'max:500'],
+            'recording_id' => ['required', 'string', 'max:255'],
+        ]);
+
+        $session->update([
+            'webcam_recording_url' => $validated['recording_url'],
+            'webcam_recording_id' => $validated['recording_id'],
+        ]);
+
+        return response()->json(['message' => 'Recording saved.']);
     }
 }
