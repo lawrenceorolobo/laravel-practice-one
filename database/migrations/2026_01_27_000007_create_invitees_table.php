@@ -12,7 +12,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuid('assessment_id');
             $table->string('email', 255);
-            $table->char('invite_token', 64)->unique();
+            $table->string('invite_token', 128)->unique();
             $table->timestamp('email_sent_at')->nullable();
             $table->timestamp('email_opened_at')->nullable();
             $table->enum('status', ['pending', 'sent', 'opened', 'started', 'completed', 'expired'])->default('pending');

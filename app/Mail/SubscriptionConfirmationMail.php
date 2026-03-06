@@ -21,6 +21,10 @@ class SubscriptionConfirmationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: new Address(
+                env('MAIL_NOTIFICATION_FROM', config('mail.from.address')),
+                env('MAIL_NOTIFICATION_NAME', config('mail.from.name'))
+            ),
             subject: 'Your Quizly subscription is active',
         );
     }

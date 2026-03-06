@@ -22,6 +22,10 @@ class AuthController extends Controller
      */
     public function register(Request $request): JsonResponse
     {
+        if (!feature('registration_enabled')) {
+            return response()->json(['message' => 'Registration is currently disabled.'], 403);
+        }
+
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],

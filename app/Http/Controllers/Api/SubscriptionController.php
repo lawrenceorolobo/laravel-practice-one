@@ -24,7 +24,9 @@ class SubscriptionController extends Controller
      */
     public function plans(): JsonResponse
     {
-        $plans = SubscriptionPlan::where('is_active', true)->get();
+        $plans = cache()->remember('subscription_plans', 300, fn() =>
+            SubscriptionPlan::where('is_active', true)->get()
+        );
 
         return response()->json([
             'plans' => $plans->map(fn ($plan) => [
@@ -47,17 +49,14 @@ class SubscriptionController extends Controller
 
         $latestPayment = $user->payments()
             ->where('status', 'success')
+            ->with('plan:id,name')
             ->latest()
             ->first();
 
         $planName = null;
         if ($latestPayment) {
             $meta = $latestPayment->metadata;
-            $planName = $meta['plan_name'] ?? null;
-            if (!$planName && $latestPayment->plan_id) {
-                $plan = SubscriptionPlan::find($latestPayment->plan_id);
-                $planName = $plan?->name;
-            }
+            $planName = $meta['plan_name'] ?? $latestPayment->plan?->name;
         }
 
         return response()->json([

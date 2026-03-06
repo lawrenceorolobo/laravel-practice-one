@@ -431,6 +431,12 @@
     loadUsers();
     loadAnalytics();
 
+    // Real-time updates via WebSocket
+    QuizlyEcho.private('admin')
+        .listen('AssessmentUpdated', () => { loadDashboard(); })
+        .listen('TestCompleted', () => { loadDashboard(); loadUsers(); })
+        .listen('InviteeUpdated', () => { loadDashboard(); });
+
     const avatarColors = ['#6366f1','#10b981','#f59e0b','#a855f7','#ef4444','#06b6d4'];
     const avatarGrads = ['#818cf8','#34d399','#fbbf24','#c084fc','#f87171','#22d3ee'];
 

@@ -81,16 +81,20 @@
         </div>
 
         <!-- Proctoring -->
-        <div class="glass rounded-2xl p-6">
+        <div class="glass rounded-2xl p-6" id="proctoringSection">
             <h3 class="font-bold text-lg mb-4">Proctoring</h3>
-            <div class="space-y-3">
+            <div id="proctoringDisabledMsg" class="hidden p-3 bg-amber-50 text-amber-700 rounded-xl text-sm mb-4">
+                ⚠️ Proctoring features are disabled by admin. Contact your administrator to enable them.
+            </div>
+            <div class="space-y-3" id="proctoringCheckboxes">
                 <div class="flex items-center gap-3">
                     <input type="checkbox" name="proctoring_enabled" id="proctoring" class="w-5 h-5 rounded">
                     <label for="proctoring">Enable proctoring</label>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3" id="webcamRow">
                     <input type="checkbox" name="webcam_required" id="webcam" class="w-5 h-5 rounded">
                     <label for="webcam">Require webcam</label>
+                    <span id="webcamDisabledHint" class="text-xs text-amber-600 hidden">(disabled by admin)</span>
                 </div>
                 <div class="flex items-center gap-3">
                     <input type="checkbox" name="fullscreen_required" id="fullscreen" class="w-5 h-5 rounded">
@@ -129,7 +133,7 @@ async function loadAssessment() {
     try {
         const res = await fetch(`/api/assessments/${id}`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
         if (!res.ok) { toastError('Failed to load assessment'); return; }
-        const { data } = await res.json();
+        const data = await res.json();
         
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('editForm').classList.remove('hidden');
@@ -163,6 +167,26 @@ async function loadAssessment() {
     } catch (err) {
         toastError('Network error loading assessment');
     }
+}
+
+// Fetch feature flags and gate proctoring UI
+async function applyFeatureFlags() {
+    try {
+        const res = await fetch('/api/feature-flags/public');
+        const flags = await res.json();
+
+        if (!flags.proctoring_enabled) {
+            document.getElementById('proctoringSection').style.display = 'none';
+        }
+
+        if (!flags.webcam_recording) {
+            document.getElementById('webcamRow').style.display = 'none';
+        }
+
+        if (!flags.send_answers_to_taker) {
+            document.getElementById('sendanswers')?.parentElement && (document.getElementById('sendanswers').parentElement.style.display = 'none');
+        }
+    } catch(e) { console.warn('Could not load feature flags'); }
 }
 
 document.getElementById('editForm').addEventListener('submit', async (e) => {
@@ -231,6 +255,6 @@ async function deleteAssessment() {
     }
 }
 
-loadAssessment();
+loadAssessment().then(() => applyFeatureFlags());
 </script>
 @endsection

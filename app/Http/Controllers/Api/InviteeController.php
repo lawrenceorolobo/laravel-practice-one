@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\InviteeUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Assessment;
 use App\Models\Invitee;
@@ -43,17 +44,34 @@ class InviteeController extends Controller
         }
 
         $validated = $request->validate([
-            'emails' => ['required_without:csv', 'array', 'max:1000'],
+            'emails' => ['required_without_all:csv,candidates', 'array', 'max:1000'],
             'emails.*' => ['email', 'max:255'],
+            'candidates' => ['required_without_all:emails,csv', 'array', 'max:1000'],
+            'candidates.*.email' => ['required', 'email', 'max:255'],
+            'candidates.*.first_name' => ['nullable', 'string', 'max:100'],
+            'candidates.*.last_name' => ['nullable', 'string', 'max:100'],
             'first_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
-            'csv' => ['required_without:emails', 'file', 'mimes:csv,txt', 'max:5120'],
+            'csv' => ['required_without_all:emails,candidates', 'file', 'mimes:csv,txt', 'max:5120'],
         ]);
 
         // Build rows: [{email, first_name, last_name}, ...]
         $rows = [];
 
-        if (isset($validated['emails'])) {
+        if (isset($validated['candidates'])) {
+            $seen = [];
+            foreach ($validated['candidates'] as $c) {
+                $email = strtolower(trim($c['email']));
+                if (!isset($seen[$email])) {
+                    $seen[$email] = true;
+                    $rows[] = [
+                        'email' => $email,
+                        'first_name' => $c['first_name'] ?? null,
+                        'last_name' => $c['last_name'] ?? null,
+                    ];
+                }
+            }
+        } elseif (isset($validated['emails'])) {
             $seen = [];
             foreach ($validated['emails'] as $email) {
                 $email = strtolower(trim($email));
@@ -133,6 +151,8 @@ class InviteeController extends Controller
             ], 409);
         }
 
+        broadcast(new InviteeUpdated($assessmentId, 'added'))->toOthers();
+
         return response()->json([
             'message' => 'Invitees added successfully.',
             'created' => $created,
@@ -160,6 +180,8 @@ class InviteeController extends Controller
 
         $invitee->delete();
         $assessment->update(['total_invites' => $assessment->invitees()->count()]);
+
+        broadcast(new InviteeUpdated($assessmentId, 'removed'))->toOthers();
 
         return response()->json([
             'message' => 'Invitee removed successfully.',
@@ -371,6 +393,142 @@ class InviteeController extends Controller
 
         fclose($handle);
         return $rows;
+    }
+
+    /**
+     * Batch delete invitees
+     */
+    public function batchDelete(Request $request, string $assessmentId): JsonResponse
+    {
+        $assessment = $this->getOwnedAssessment($request, $assessmentId);
+
+        $validated = $request->validate([
+            'invitee_ids' => ['required', 'array', 'min:1'],
+            'invitee_ids.*' => ['required', 'uuid'],
+        ]);
+
+        $deleted = Invitee::where('assessment_id', $assessment->id)
+            ->whereIn('id', $validated['invitee_ids'])
+            ->whereNotIn('status', ['started', 'completed'])
+            ->delete();
+
+        $assessment->update(['total_invites' => $assessment->invitees()->count()]);
+
+        broadcast(new InviteeUpdated($assessmentId, 'removed'))->toOthers();
+
+        return response()->json([
+            'message' => "Deleted {$deleted} candidate(s).",
+            'deleted' => $deleted,
+        ]);
+    }
+
+    /**
+     * Batch resend invitations
+     */
+    public function batchResend(Request $request, string $assessmentId): JsonResponse
+    {
+        $assessment = $this->getOwnedAssessment($request, $assessmentId);
+
+        $validated = $request->validate([
+            'invitee_ids' => ['required', 'array', 'min:1'],
+            'invitee_ids.*' => ['required', 'uuid'],
+        ]);
+
+        $invitees = Invitee::where('assessment_id', $assessment->id)
+            ->whereIn('id', $validated['invitee_ids'])
+            ->whereNotIn('status', ['started', 'completed'])
+            ->get();
+
+        $queued = 0;
+        foreach ($invitees as $invitee) {
+            $invitee->update(['email_status' => 'queued']);
+            dispatch(function () use ($assessment, $invitee) {
+                try {
+                    \Illuminate\Support\Facades\Mail::to($invitee->email)->send(new \App\Mail\InvitationMail($assessment, $invitee));
+                    $invitee->update(['email_status' => 'sent', 'email_sent_at' => now()]);
+                } catch (\Exception $e) {
+                    $invitee->update(['email_status' => 'failed']);
+                    \Log::warning("Batch resend failed for {$invitee->email}: " . $e->getMessage());
+                }
+            });
+            $queued++;
+        }
+
+        broadcast(new InviteeUpdated($assessmentId, 'email_sent'))->toOthers();
+
+        return response()->json([
+            'message' => "Queued {$queued} invitation(s) for resend.",
+            'queued' => $queued,
+        ]);
+    }
+
+    /**
+     * Get candidates from user's other assessments (for reuse)
+     */
+    public function previousCandidates(Request $request, string $assessmentId): JsonResponse
+    {
+        $assessment = $this->getOwnedAssessment($request, $assessmentId);
+
+        // Get all emails already invited to this assessment
+        $existingEmails = $assessment->invitees()
+            ->pluck('email')
+            ->map(fn($e) => strtolower($e))
+            ->toArray();
+
+        // Get unique candidates from other assessments by this user
+        $otherAssessmentIds = Assessment::where('user_id', $request->user()->id)
+            ->where('id', '!=', $assessmentId)
+            ->pluck('id');
+
+        $candidates = Invitee::whereIn('assessment_id', $otherAssessmentIds)
+            ->select('email', 'first_name', 'last_name', 'assessment_id')
+            ->with('assessment:id,title')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->filter(fn($inv) => !in_array(strtolower($inv->email), $existingEmails))
+            ->unique('email')
+            ->values()
+            ->map(fn($inv) => [
+                'email' => $inv->email,
+                'first_name' => $inv->first_name,
+                'last_name' => $inv->last_name,
+                'from_assessment' => $inv->assessment?->title ?? 'Unknown',
+            ]);
+
+        return response()->json(['data' => $candidates]);
+    }
+
+    /**
+     * Get ALL candidates across all user's assessments (single query, no N+1)
+     */
+    public function allCandidates(Request $request): JsonResponse
+    {
+        $search = $request->input('search');
+        $status = $request->input('status');
+
+        $query = Invitee::whereIn('assessment_id', function ($q) use ($request) {
+                $q->select('id')->from('assessments')->where('user_id', $request->user()->id);
+            })
+            ->with([
+                'assessment:id,title',
+                'testSession:id,invitee_id,status,percentage,passed,total_score,max_score,tab_switches,fullscreen_exits,time_spent_seconds',
+            ])
+            ->select(['id', 'assessment_id', 'email', 'first_name', 'last_name', 'status', 'created_at']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        $candidates = $query->orderByDesc('created_at')->get();
+
+        return response()->json(['data' => $candidates]);
     }
 
     protected function getOwnedAssessment(Request $request, string $assessmentId): Assessment

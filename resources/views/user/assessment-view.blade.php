@@ -18,6 +18,10 @@
             <p class="text-slate-500" id="description"></p>
         </div>
         <div class="flex gap-3">
+            <button onclick="exportResultsCsv()" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm flex items-center gap-2" title="Export results as CSV">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Export CSV
+            </button>
             <button onclick="editAssessment()" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Edit</button>
             <button onclick="publishAssessment()" id="publishBtn" class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Publish</button>
         </div>
@@ -242,6 +246,22 @@
                     <button type="button" onclick="closeInviteModal()" class="px-6 py-3 border rounded-lg">Cancel</button>
                 </div>
             </form>
+            <!-- Existing candidates from other assessments -->
+            <div class="mt-5 pt-4 border-t">
+                <p class="text-sm font-semibold text-slate-700 mb-2">Or add from previous assessments</p>
+                <input type="text" id="reuseSearchInput" placeholder="Search by email or name..." class="w-full px-4 py-2 border rounded-lg text-sm mb-3" oninput="filterReuseCandidates()">
+                <div id="reuseLoading" class="text-center py-4 text-sm text-slate-400">Loading candidates...</div>
+                <div id="reuseEmpty" class="hidden text-center py-4 text-sm text-slate-400">No candidates from other assessments</div>
+                <div id="reuseCandidatesList" class="hidden max-h-48 overflow-y-auto border rounded-lg">
+                    <div class="sticky top-0 bg-slate-50 flex items-center gap-2 px-3 py-2 border-b">
+                        <input type="checkbox" id="reuseSelectAll" onchange="toggleAllReuse(this.checked)" class="w-4 h-4">
+                        <label for="reuseSelectAll" class="text-xs font-medium text-slate-600">Select All</label>
+                        <span id="reuseSelectedCount" class="ml-auto text-xs text-slate-400">0 selected</span>
+                    </div>
+                    <div id="reuseRows"></div>
+                </div>
+                <button type="button" id="addReuseCandidatesBtn" disabled onclick="addReuseCandidates()" class="hidden w-full mt-3 bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed">Add Selected Candidates</button>
+            </div>
         </div>
         <!-- CSV Tab -->
         <div id="inviteCsvTab" class="hidden">
@@ -392,22 +412,38 @@ function renderAssessment() {
     
     renderQuestions();
     loadInvitees();
+
+    // Real-time updates via WebSocket
+    QuizlyEcho.private('assessment.' + assessmentId)
+        .listen('InviteeUpdated', () => loadInvitees())
+        .listen('TestCompleted', () => { loadInvitees(); loadAssessment(); });
 }
+
+let selectedQuestions = new Set();
 
 function renderQuestions() {
     const list = document.getElementById('questionsList');
+    selectedQuestions.clear();
+    updateBatchToolbar();
     if (!assessment.questions?.length) {
         list.innerHTML = '<p class="text-slate-500 text-center py-8">No questions yet. Add your first question.</p>';
         return;
     }
-    list.innerHTML = assessment.questions.map((q, i) => `
+    const header = `
+        <div class="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b">
+            <input type="checkbox" id="selectAllQuestions" onchange="toggleAllQuestions(this.checked)" class="w-4 h-4 accent-indigo-600">
+            <label for="selectAllQuestions" class="text-xs font-medium text-slate-500 select-none cursor-pointer">Select All</label>
+            <span id="selectedQCount" class="ml-auto text-xs text-slate-400"></span>
+        </div>`;
+    const rows = assessment.questions.map((q, i) => `
         <div class="flex items-center justify-between p-4 border-b last:border-0">
-            <div class="flex-1">
-                <span class="font-bold text-indigo-600 mr-2">Q${i + 1}.</span>
-                <span>${q.question_text}</span>
-                <span class="ml-2 text-xs px-2 py-0.5 bg-slate-100 rounded text-slate-500">${q.question_type.replace('_', ' ')}</span>
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <input type="checkbox" class="q-cb w-4 h-4 accent-indigo-600" data-id="${q.id}" onchange="onQuestionCheck()">
+                <span class="font-bold text-indigo-600 shrink-0">Q${i + 1}.</span>
+                <span class="truncate">${q.question_text}</span>
+                <span class="ml-2 text-xs px-2 py-0.5 bg-slate-100 rounded text-slate-500 shrink-0">${q.question_type.replace('_', ' ')}</span>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 shrink-0">
                 <span class="text-sm text-slate-500">${q.points} pts</span>
                 <button onclick='editQuestion(${JSON.stringify(q).replace(/'/g, "&apos;")})' class="text-indigo-500 hover:text-indigo-700" title="Edit">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -418,6 +454,67 @@ function renderQuestions() {
             </div>
         </div>
     `).join('');
+    list.innerHTML = header + rows;
+}
+
+function onQuestionCheck() {
+    selectedQuestions.clear();
+    document.querySelectorAll('.q-cb:checked').forEach(cb => selectedQuestions.add(cb.dataset.id));
+    const allCbs = document.querySelectorAll('.q-cb');
+    const selectAll = document.getElementById('selectAllQuestions');
+    if (selectAll) selectAll.checked = allCbs.length > 0 && selectedQuestions.size === allCbs.length;
+    document.getElementById('selectedQCount').textContent = selectedQuestions.size ? `${selectedQuestions.size} selected` : '';
+    updateBatchToolbar();
+}
+
+function toggleAllQuestions(checked) {
+    document.querySelectorAll('.q-cb').forEach(cb => { cb.checked = checked; });
+    onQuestionCheck();
+}
+
+function updateBatchToolbar() {
+    let bar = document.getElementById('batchQToolbar');
+    if (selectedQuestions.size > 0) {
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'batchQToolbar';
+            bar.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-4 z-50 animate-slide-up';
+            bar.innerHTML = `
+                <span id="batchQCount" class="text-sm font-medium"></span>
+                <button onclick="batchDeleteQuestions()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition">Delete Selected</button>
+                <button onclick="toggleAllQuestions(false)" class="text-slate-300 hover:text-white text-sm">Cancel</button>
+            `;
+            document.body.appendChild(bar);
+        }
+        document.getElementById('batchQCount').textContent = `${selectedQuestions.size} question${selectedQuestions.size > 1 ? 's' : ''}`;
+    } else if (bar) {
+        bar.remove();
+    }
+}
+
+async function batchDeleteQuestions() {
+    if (!selectedQuestions.size) return;
+    const count = selectedQuestions.size;
+    const confirmed = await showConfirm('Delete Questions', `Are you sure you want to delete ${count} question${count > 1 ? 's' : ''}? This cannot be undone.`, 'Delete', 'danger');
+    if (!confirmed) return;
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/questions/batch-delete`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ question_ids: Array.from(selectedQuestions) })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            toastSuccess(result.message || `Deleted ${count} question(s)`);
+            selectedQuestions.clear();
+            updateBatchToolbar();
+            loadAssessment();
+        } else {
+            toastError(result.message || 'Failed to delete');
+        }
+    } catch (e) {
+        toastError('Network error');
+    }
 }
 
 async function loadInvitees() {
@@ -457,31 +554,122 @@ async function loadInvitees() {
                 return `<span class="px-2 py-1 rounded text-xs font-medium ${emailColors[emailLabel] || 'bg-slate-100 text-slate-500'}">${emailLabel === 'sent' ? '✉ sent' : emailLabel}</span>`;
             }
 
-            list.innerHTML = data.data.map(inv => `
-                <div class="flex items-center justify-between p-3 border-b last:border-0 group hover:bg-slate-50">
-                    <div class="flex-1 min-w-0">
-                        <p class="font-medium truncate">${inv.first_name || inv.last_name ? `${inv.first_name || ''} ${inv.last_name || ''}`.trim() : ''}</p>
-                        <p class="text-sm text-slate-500 truncate">${inv.email}</p>
+            const header = `
+                <div class="flex items-center gap-3 px-3 py-2 bg-slate-50 border-b">
+                    <input type="checkbox" id="selectAllInvitees" onchange="toggleAllInvitees(this.checked)" class="w-4 h-4 accent-indigo-600">
+                    <label for="selectAllInvitees" class="text-xs font-medium text-slate-500 select-none cursor-pointer">Select All</label>
+                    <span id="selectedInvCount" class="ml-auto text-xs text-slate-400"></span>
+                </div>`;
+            const rows = data.data.map(inv => `
+                <div class="flex items-center justify-between p-3 border-b last:border-0 group hover:bg-slate-50 ${inv.status === 'completed' && inv.test_session ? 'cursor-pointer border-l-3 border-l-emerald-400' : ''}" ${inv.status === 'completed' && inv.test_session ? `onclick="viewAnswers('${inv.test_session.id}')"` : ''}>
+                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                        <input type="checkbox" class="inv-cb w-4 h-4 accent-indigo-600" data-id="${inv.id}" onchange="onInviteeCheck()" onclick="event.stopPropagation()">
+                        <div class="min-w-0">
+                            <p class="font-medium truncate">${inv.first_name || inv.last_name ? `${inv.first_name || ''} ${inv.last_name || ''}`.trim() : ''}</p>
+                            <p class="text-sm text-slate-500 truncate">${inv.email}</p>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2 ml-3">
                         ${inviteeStatusBadge(inv)}
                         ${inv.test_session?.percentage != null ? `<span class="text-sm font-semibold ${inv.test_session.passed ? 'text-emerald-400' : 'text-red-400'}">${parseFloat(inv.test_session.percentage).toFixed(1)}%</span>` : ''}
+                        ${inv.status === 'completed' && inv.test_session ? `<span class="text-xs text-emerald-500 opacity-0 group-hover:opacity-100 transition font-medium">View Answers →</span>` : ''}
                         ${!['started', 'completed'].includes(inv.status) ? `
-                            <button onclick="openEditInvitee('${inv.id}', '${inv.email}', '${inv.first_name || ''}', '${inv.last_name || ''}')" class="text-indigo-500 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition" title="Edit">
+                            <button onclick="event.stopPropagation(); openEditInvitee('${inv.id}', '${inv.email}', '${inv.first_name || ''}', '${inv.last_name || ''}')" class="text-indigo-500 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition" title="Edit">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </button>
-                            <button onclick="resendInvite('${inv.id}')" class="text-blue-500 hover:text-blue-700 opacity-0 group-hover:opacity-100 transition" title="Resend">
+                            <button onclick="event.stopPropagation(); resendInvite('${inv.id}')" class="text-blue-500 hover:text-blue-700 opacity-0 group-hover:opacity-100 transition" title="Resend">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             </button>
-                            <button onclick="deleteInvitee('${inv.id}')" class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition" title="Delete">
+                            <button onclick="event.stopPropagation(); deleteInvitee('${inv.id}')" class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition" title="Delete">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         ` : ''}
                     </div>
                 </div>
             `).join('');
+            list.innerHTML = header + rows;
         }
     } catch (err) {}
+}
+
+let selectedInvitees = new Set();
+
+function onInviteeCheck() {
+    selectedInvitees.clear();
+    document.querySelectorAll('.inv-cb:checked').forEach(cb => selectedInvitees.add(cb.dataset.id));
+    const allCbs = document.querySelectorAll('.inv-cb');
+    const selectAll = document.getElementById('selectAllInvitees');
+    if (selectAll) selectAll.checked = allCbs.length > 0 && selectedInvitees.size === allCbs.length;
+    const countEl = document.getElementById('selectedInvCount');
+    if (countEl) countEl.textContent = selectedInvitees.size ? `${selectedInvitees.size} selected` : '';
+    updateInvBatchToolbar();
+}
+
+function toggleAllInvitees(checked) {
+    document.querySelectorAll('.inv-cb').forEach(cb => { cb.checked = checked; });
+    onInviteeCheck();
+}
+
+function updateInvBatchToolbar() {
+    let bar = document.getElementById('batchInvToolbar');
+    if (selectedInvitees.size > 0) {
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'batchInvToolbar';
+            bar.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-4 z-50';
+            bar.innerHTML = `
+                <span id="batchInvCount" class="text-sm font-medium"></span>
+                <button onclick="batchResendInvitees()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition">Resend Email</button>
+                <button onclick="batchDeleteInvitees()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition">Delete Selected</button>
+                <button onclick="toggleAllInvitees(false)" class="text-slate-300 hover:text-white text-sm">Cancel</button>
+            `;
+            document.body.appendChild(bar);
+        }
+        document.getElementById('batchInvCount').textContent = `${selectedInvitees.size} candidate${selectedInvitees.size > 1 ? 's' : ''}`;
+    } else if (bar) {
+        bar.remove();
+    }
+}
+
+async function batchDeleteInvitees() {
+    if (!selectedInvitees.size) return;
+    const count = selectedInvitees.size;
+    const confirmed = await showConfirm('Delete Candidates', `Delete ${count} candidate${count > 1 ? 's' : ''}? This cannot be undone.`, 'Delete', 'danger');
+    if (!confirmed) return;
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/invitees/batch-delete`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ invitee_ids: Array.from(selectedInvitees) })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            toastSuccess(result.message || `Deleted ${count} candidate(s)`);
+            selectedInvitees.clear();
+            updateInvBatchToolbar();
+            loadInvitees();
+            loadAssessment();
+        } else toastError(result.message || 'Failed');
+    } catch (e) { toastError('Network error'); }
+}
+
+async function batchResendInvitees() {
+    if (!selectedInvitees.size) return;
+    const count = selectedInvitees.size;
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/invitees/batch-resend`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ invitee_ids: Array.from(selectedInvitees) })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            toastSuccess(result.message || `Resending to ${count} candidate(s)`);
+            selectedInvitees.clear();
+            updateInvBatchToolbar();
+            loadInvitees();
+        } else toastError(result.message || 'Failed');
+    } catch (e) { toastError('Network error'); }
 }
 
 let currentType = 'single_choice';
@@ -654,8 +842,127 @@ function closeQuestionModal() {
 function openInviteModal() {
     document.getElementById('inviteModal').classList.remove('hidden');
     document.getElementById('addCandidateBtn').disabled = true;
+    switchInviteTab('manual');
+    loadReuseCandidates();
 }
 function closeInviteModal() { document.getElementById('inviteModal').classList.add('hidden'); }
+
+function switchInviteTab(tab) {
+    ['manual', 'csv'].forEach(t => {
+        const tabEl = document.getElementById('inviteTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const panel = document.getElementById('invite' + t.charAt(0).toUpperCase() + t.slice(1) + 'Tab');
+        if (tabEl && panel) {
+            if (t === tab) {
+                tabEl.classList.add('border-indigo-600', 'text-indigo-600');
+                tabEl.classList.remove('border-transparent', 'text-gray-500');
+                panel.classList.remove('hidden');
+            } else {
+                tabEl.classList.remove('border-indigo-600', 'text-indigo-600');
+                tabEl.classList.add('border-transparent', 'text-gray-500');
+                panel.classList.add('hidden');
+            }
+        }
+    });
+}
+
+let reuseCandidates = [];
+let reuseSelected = new Set();
+
+async function loadReuseCandidates() {
+    document.getElementById('reuseLoading').classList.remove('hidden');
+    document.getElementById('reuseEmpty').classList.add('hidden');
+    document.getElementById('reuseCandidatesList').classList.add('hidden');
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/previous-candidates`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+        });
+        const { data } = await res.json();
+        reuseCandidates = data || [];
+        reuseSelected.clear();
+        document.getElementById('reuseLoading').classList.add('hidden');
+        if (!reuseCandidates.length) {
+            document.getElementById('reuseEmpty').classList.remove('hidden');
+            return;
+        }
+        document.getElementById('reuseCandidatesList').classList.remove('hidden');
+        renderReuseCandidates(reuseCandidates);
+    } catch (e) {
+        document.getElementById('reuseLoading').innerHTML = '<p class="text-red-500 text-sm">Failed to load</p>';
+    }
+}
+
+function renderReuseCandidates(list) {
+    document.getElementById('reuseRows').innerHTML = list.map((c, i) => `
+        <label class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer border-b last:border-0">
+            <input type="checkbox" class="reuse-cb w-4 h-4" data-idx="${i}" onchange="onReuseCheck()" ${reuseSelected.has(c.email) ? 'checked' : ''}>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">${c.first_name || c.last_name ? (c.first_name || '') + ' ' + (c.last_name || '') : c.email}</p>
+                <p class="text-xs text-slate-400 truncate">${c.email} &middot; from "${c.from_assessment}"</p>
+            </div>
+        </label>
+    `).join('');
+}
+
+function filterReuseCandidates() {
+    const q = document.getElementById('reuseSearchInput').value.toLowerCase();
+    const filtered = reuseCandidates.filter(c => 
+        c.email.toLowerCase().includes(q) || 
+        (c.first_name || '').toLowerCase().includes(q) || 
+        (c.last_name || '').toLowerCase().includes(q)
+    );
+    renderReuseCandidates(filtered);
+}
+
+function onReuseCheck() {
+    reuseSelected.clear();
+    document.querySelectorAll('.reuse-cb:checked').forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        if (reuseCandidates[idx]) reuseSelected.add(reuseCandidates[idx].email);
+    });
+    document.getElementById('reuseSelectedCount').textContent = reuseSelected.size + ' selected';
+    const btn = document.getElementById('addReuseCandidatesBtn');
+    btn.disabled = reuseSelected.size === 0;
+    if (reuseSelected.size > 0) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+}
+
+function toggleAllReuse(checked) {
+    document.querySelectorAll('.reuse-cb').forEach(cb => { cb.checked = checked; });
+    onReuseCheck();
+}
+
+async function addReuseCandidates() {
+    if (!reuseSelected.size) return;
+    // Build candidates with names from reuseCandidates array
+    const candidates = reuseCandidates
+        .filter(c => reuseSelected.has(c.email))
+        .map(c => ({ email: c.email, first_name: c.first_name || null, last_name: c.last_name || null }));
+    if (!candidates.length) return;
+    const btn = document.getElementById('addReuseCandidatesBtn');
+    btn.disabled = true;
+    btn.textContent = 'Adding...';
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/invitees`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ candidates })
+        });
+        const result = await res.json();
+        if (res.ok || res.status === 201) {
+            toastSuccess(`Added ${result.created || 0} candidate(s)` + (result.skipped ? `, ${result.skipped} already invited` : ''));
+            closeInviteModal();
+            loadInvitees();
+            loadAssessment();
+        } else {
+            toastError(result.message || 'Failed to add candidates');
+        }
+    } catch (e) {
+        toastError('Network error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Add Selected Candidates';
+    }
+}
 
 // Progressive form validation
 function checkInviteForm() {
@@ -1028,7 +1335,24 @@ async function uploadQuestionCsv() {
 }
 
 function downloadQuestionTemplate() {
-    const csv = 'question_text,question_type,points,option_a,option_b,option_c,option_d,correct_answer,expected_answer\nWhat is 2+2?,single_choice,1,3,4,5,6,B,\nSelect all prime numbers,multiple_choice,2,2,4,5,6,"A,C",\nWhat is the capital of France?,text_input,1,,,,,,,Paris\n';
+    const csv = [
+        'question_text,question_type,points,option_a,option_b,option_c,option_d,correct_answer,expected_answer',
+        'What is 2+2?,single_choice,1,3,4,5,6,B,',
+        'Select all prime numbers,multiple_choice,2,2,4,5,6,"A,C",',
+        'The sun revolves around the earth,true_false,1,,,,,FALSE,',
+        'What is the capital of France?,text_input,1,,,,,,Paris',
+        'The chemical symbol for water is ___,fill_blank,1,,,,,,H2O',
+        'What is 15 x 12?,numeric,2,,,,,,180',
+        'Solve: If a train travels 60km/h for 3 hours how far does it go?,word_problem,2,,,,,,180',
+        'What is 25% of 200?,mental_maths,1,,,,,,50',
+        'What does console.log(typeof null) output?,code_snippet,2,,,,,,object',
+        'Dog is to puppy as cat is to?,analogy,1,Kitten,Cub,Foal,Calf,A,',
+        'Which does not belong: Apple Banana Carrot Orange?,odd_one_out,1,Apple,Banana,Carrot,Orange,C,',
+        'What comes next: 2 4 8 16 ?,pattern_recognition,1,24,32,30,20,B,',
+        'I enjoy working in teams,likert_scale,1,Strongly Agree,Agree,Disagree,Strongly Disagree,A,',
+        '"Arrange alphabetically: Banana Apple Cherry",ordering,1,,,,,,Apple Banana Cherry',
+        '"Match: H2O=Water CO2=Carbon Dioxide",matching,1,,,,,,H2O:Water|CO2:Carbon Dioxide',
+    ].join('\n') + '\n';
     downloadCsvBlob(csv, 'question_template.csv');
 }
 
@@ -1146,6 +1470,119 @@ document.getElementById('editInviteeForm').addEventListener('submit', async (e) 
     } catch { toastError('Network error'); }
 });
 
+// ===== View Candidate Answers =====
+async function viewAnswers(sessionId) {
+    const modal = document.getElementById('answersModal');
+    const body = document.getElementById('answersBody');
+    modal.classList.remove('hidden');
+    body.innerHTML = '<div class="text-center py-12"><div class="skeleton h-8 w-48 mx-auto mb-4"></div><p class="text-slate-400">Loading answers...</p></div>';
+
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/sessions/${sessionId}/answers`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error('Failed to load answers');
+        const data = await res.json();
+
+        const s = data.session;
+        const header = `
+            <div class="flex items-center justify-between bg-slate-50 rounded-xl p-4 mb-6">
+                <div>
+                    <h3 class="font-bold text-lg">${s.candidate || 'Candidate'}</h3>
+                    <p class="text-slate-500 text-sm">${s.email}</p>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                    <span class="px-3 py-1 rounded-full font-bold ${s.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${s.score.toFixed(1)}% — ${s.passed ? 'Passed' : 'Failed'}</span>
+                    <span class="text-slate-500">${data.correct_count}/${data.total_questions} correct</span>
+                    ${s.time_spent ? `<span class="text-slate-500">${Math.round(s.time_spent / 60)} min</span>` : ''}
+                    ${s.tab_switches > 0 ? `<span class="text-amber-600" title="Tab switches">⚠ ${s.tab_switches} tab switch${s.tab_switches > 1 ? 'es' : ''}</span>` : ''}
+                </div>
+            </div>`;
+
+        const questions = data.answers.map((a, i) => {
+            const optionsHtml = a.options.length > 0 ? a.options.map(o => {
+                const selected = (a.selected_options || []).includes(o.label);
+                const isCorrect = o.is_correct;
+                let cls = 'border p-2 rounded text-sm flex items-center gap-2';
+                if (selected && isCorrect) cls += ' bg-emerald-50 border-emerald-300';
+                else if (selected && !isCorrect) cls += ' bg-red-50 border-red-300';
+                else if (isCorrect) cls += ' bg-emerald-50 border-emerald-200 opacity-70';
+                else cls += ' border-slate-200';
+                return `<div class="${cls}">
+                    ${selected ? (isCorrect ? '✅' : '❌') : (isCorrect ? '✓' : '○')}
+                    <span class="font-medium">${o.label}.</span> ${o.text}
+                </div>`;
+            }).join('') : (a.text_answer ? `<div class="border p-3 rounded bg-slate-50 text-sm"><strong>Answer:</strong> ${a.text_answer}</div>` : '<p class="text-slate-400 text-sm">No answer provided</p>');
+
+            return `
+                <div class="border rounded-xl p-4 ${a.is_correct ? 'border-emerald-200' : 'border-red-200'}">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex-1">
+                            <span class="text-xs font-bold ${a.is_correct ? 'text-emerald-600' : 'text-red-600'} uppercase">Q${i + 1} — ${a.is_correct ? 'Correct' : 'Incorrect'}</span>
+                            <p class="font-medium mt-1">${a.question_text}</p>
+                        </div>
+                        <span class="text-sm font-bold ${a.is_correct ? 'text-emerald-600' : 'text-slate-400'}">${a.points_earned}/${a.max_points} pts</span>
+                    </div>
+                    <div class="space-y-2">${optionsHtml}</div>
+                </div>`;
+        }).join('');
+
+        body.innerHTML = header + '<div class="space-y-4">' + questions + '</div>';
+    } catch (err) {
+        body.innerHTML = `<p class="text-red-500 text-center py-8">Failed to load answers. ${err.message}</p>`;
+    }
+}
+
+function closeAnswersModal() {
+    document.getElementById('answersModal').classList.add('hidden');
+}
+
+// ===== Export Results CSV =====
+async function exportResultsCsv() {
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/results?per_page=1000`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error();
+        const { data } = await res.json();
+        if (!data?.length) { toastError('No results to export'); return; }
+
+        const headers = ['Name', 'Email', 'Score (%)', 'Passed', 'Time (min)', 'Tab Switches', 'Fullscreen Exits', 'Status', 'Submitted At'];
+        const rows = data.map(s => [
+            `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+            s.email,
+            s.percentage != null ? parseFloat(s.percentage).toFixed(1) : '-',
+            s.passed ? 'Yes' : 'No',
+            s.time_spent_seconds ? Math.round(s.time_spent_seconds / 60) : '-',
+            s.tab_switches || 0,
+            s.fullscreen_exits || 0,
+            s.status,
+            s.submitted_at || '-',
+        ]);
+
+        const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${assessment?.title || 'assessment'}-results.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toastSuccess('CSV downloaded');
+    } catch { toastError('Failed to export'); }
+}
+
 loadAssessment();
 </script>
+
+<!-- Answers Modal -->
+<div id="answersModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick="if(event.target===this) closeAnswersModal()">
+    <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl mx-4">
+        <div class="flex items-center justify-between p-6 border-b">
+            <h2 class="text-xl font-bold">Candidate Answers</h2>
+            <button onclick="closeAnswersModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+        </div>
+        <div id="answersBody" class="p-6 overflow-y-auto flex-1"></div>
+    </div>
+</div>
 @endsection

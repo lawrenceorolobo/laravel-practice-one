@@ -28,6 +28,14 @@ class PaymentController extends Controller
      */
     public function initialize(Request $request): JsonResponse
     {
+        if (!feature('payments_enabled')) {
+            return response()->json(['message' => 'Payments are currently disabled.'], 403);
+        }
+
+        if (!feature('flutterwave_enabled')) {
+            return response()->json(['message' => 'Payment provider is currently unavailable.'], 403);
+        }
+
         $validated = $request->validate([
             'plan_id' => ['required', 'uuid', 'exists:subscription_plans,id'],
         ]);
@@ -181,13 +189,15 @@ class PaymentController extends Controller
     }
 
     /**
-     * Get available plans for selection page
+     * Get available plans for selection page (cached 5 min)
      */
     public function plans(): JsonResponse
     {
-        $plans = SubscriptionPlan::where('is_active', true)
-            ->orderBy('monthly_price')
-            ->get();
+        $plans = cache()->remember('subscription_plans', 300, function () {
+            return SubscriptionPlan::where('is_active', true)
+                ->orderBy('monthly_price')
+                ->get();
+        });
 
         return response()->json(['plans' => $plans]);
     }

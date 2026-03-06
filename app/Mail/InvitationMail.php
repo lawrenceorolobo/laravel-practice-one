@@ -31,6 +31,10 @@ class InvitationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: new \Illuminate\Mail\Mailables\Address(
+                env('MAIL_INVITATION_FROM', config('mail.from.address')),
+                env('MAIL_INVITATION_NAME', config('mail.from.name'))
+            ),
             subject: "You're Invited: {$this->assessment->title}",
         );
     }

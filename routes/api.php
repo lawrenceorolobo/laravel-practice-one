@@ -55,8 +55,17 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::post('/join/{accessCode}', [TestController::class, 'joinByAccessCode']);
     });
 
+    // Contact Form (Public, Rate Limited)
+    Route::post('/contact', [\App\Http\Controllers\Api\ContactController::class, 'send'])
+        ->middleware('throttle:5,1');
+
     // Subscription Plans (Public)
     Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+
+    // Public Feature Flags (cached, no auth)
+    Route::get('/feature-flags/public', function () {
+        return response()->json(feature_flags_public());
+    });
 
     // Paystack Webhook (No auth, signature verified in controller)
     Route::post('/webhooks/paystack', [SubscriptionController::class, 'webhook']);
@@ -101,6 +110,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
             Route::post('/assessments/{assessment}/publish', [AssessmentController::class, 'publish']);
             Route::get('/assessments/{assessment}/results', [AssessmentController::class, 'results']);
             Route::get('/assessments/{assessment}/analytics', [AssessmentController::class, 'analytics']);
+            Route::get('/assessments/{assessment}/sessions/{session}/answers', [AssessmentController::class, 'sessionAnswers']);
 
             // Questions
             Route::post('/assessments/{assessment}/questions', [QuestionController::class, 'store']);
@@ -108,6 +118,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
             Route::delete('/assessments/{assessment}/questions/{question}', [QuestionController::class, 'destroy']);
             Route::post('/assessments/{assessment}/questions/reorder', [QuestionController::class, 'reorder']);
             Route::post('/assessments/{assessment}/questions/import', [QuestionController::class, 'importCSV']);
+            Route::post('/assessments/{assessment}/questions/batch-delete', [QuestionController::class, 'batchDelete']);
 
             // Invitees
             Route::get('/assessments/{assessment}/invitees', [InviteeController::class, 'index']);
@@ -116,6 +127,10 @@ Route::middleware([SanitizeInput::class])->group(function () {
             Route::delete('/assessments/{assessment}/invitees/{invitee}', [InviteeController::class, 'destroy']);
             Route::post('/assessments/{assessment}/invitees/send', [InviteeController::class, 'sendInvites']);
             Route::post('/assessments/{assessment}/invitees/{invitee}/resend', [InviteeController::class, 'resend']);
+            Route::get('/assessments/{assessment}/previous-candidates', [InviteeController::class, 'previousCandidates']);
+            Route::post('/assessments/{assessment}/invitees/batch-delete', [InviteeController::class, 'batchDelete']);
+            Route::post('/assessments/{assessment}/invitees/batch-resend', [InviteeController::class, 'batchResend']);
+            Route::get('/candidates', [InviteeController::class, 'allCandidates']);
         });
     });
 

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 // Public landing pages
 Route::view('/', 'home')->name('home');
 Route::view('/about', 'about')->name('about');
+Route::view('/contact', 'contact')->name('contact');
 
 // Auth pages
 Route::view('/login', 'auth.login')->name('login');

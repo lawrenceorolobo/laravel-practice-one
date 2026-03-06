@@ -84,7 +84,7 @@ function updateStatsError(){['stat-total','stat-active','stat-completed','stat-s
 
 function renderAssessments(list){const tb=document.getElementById('assessmentsTable');if(!list.length){tb.innerHTML='<tr><td colspan="7" class="px-5 py-10 text-center text-[12px]" style="color:var(--text-muted)">No assessments found</td></tr>';return}
 const sb=s=>s==='active'?'badge-success':s==='completed'?'badge-neutral':'badge-warning';
-tb.innerHTML=list.map(a=>`<tr class="tr-click" style="border-bottom:1px solid var(--border-subtle);">
+tb.innerHTML=list.map(a=>`<tr class="tr-click" style="border-bottom:1px solid var(--border-subtle);cursor:pointer;" onclick="viewAssessment('${a.id}')">
 <td class="px-4 lg:px-5 py-2.5"><div class="min-w-0"><p class="text-[13px] font-medium truncate" style="color:var(--text-primary)">${a.title}</p><p class="text-[11px]" style="color:var(--text-muted)">${a.questions_count||0} questions</p></div></td>
 <td class="px-4 lg:px-5 py-2.5 text-[12px] hidden md:table-cell truncate" style="color:var(--text-secondary)">${a.user?.first_name||'Unknown'} ${a.user?.last_name||''}</td>
 <td class="px-4 lg:px-5 py-2.5 text-[12px] hidden sm:table-cell" style="color:var(--text-secondary)">${a.invitees_count||0}</td>
@@ -92,8 +92,7 @@ tb.innerHTML=list.map(a=>`<tr class="tr-click" style="border-bottom:1px solid va
 <td class="px-4 lg:px-5 py-2.5"><span class="badge ${sb(a.status)}">${a.status||'draft'}</span></td>
 <td class="px-4 lg:px-5 py-2.5 text-[11px] hidden lg:table-cell" style="color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
 <td class="px-4 lg:px-5 py-2.5"><div class="flex items-center gap-0.5">
-<button onclick="viewAssessment('${a.id}')" class="p-1.5 rounded-lg transition" style="color:var(--text-secondary)" onmouseover="this.style.background='var(--surface-raised)'" onmouseout="this.style.background='transparent'" title="View"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-<button onclick="deleteAssessment('${a.id}')" class="p-1.5 rounded-lg hover:bg-red-500/10 transition" title="Delete"><svg class="w-3.5 h-3.5" style="color:#f87171" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+<button onclick="event.stopPropagation();deleteAssessment('${a.id}')" class="p-1.5 rounded-lg hover:bg-red-500/10 transition" title="Delete"><svg class="w-3.5 h-3.5" style="color:#f87171" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
 </div></td></tr>`).join('')}
 
 async function viewAssessment(id){const m=document.getElementById('assessmentModal'),b=document.getElementById('assessmentModalBody');document.getElementById('assessmentModalTitle').textContent='Loading...';b.innerHTML='<div class="text-center py-8"><div class="animate-spin w-6 h-6 border-2 border-t-transparent rounded-full mx-auto" style="border-color:#6366f1;border-top-color:transparent"></div></div>';m.classList.remove('hidden');m.classList.add('flex');

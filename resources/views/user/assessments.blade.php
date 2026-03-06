@@ -83,5 +83,12 @@ async function loadAssessments() {
 document.getElementById('searchInput').addEventListener('input', loadAssessments);
 document.getElementById('statusFilter').addEventListener('change', loadAssessments);
 loadAssessments();
+
+// Real-time updates via WebSocket
+if (typeof user !== 'undefined' && user?.id) {
+    QuizlyEcho.private('user.' + user.id)
+        .listen('AssessmentUpdated', () => loadAssessments())
+        .listen('TestCompleted', () => loadAssessments());
+}
 </script>
 @endsection

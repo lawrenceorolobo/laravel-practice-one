@@ -358,6 +358,46 @@
             </div>
         </div>
 
+        <!-- Mini Analytics -->
+        <div class="grid lg:grid-cols-3 gap-6 mt-6">
+            <!-- Score Distribution Mini -->
+            <div class="glass rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-900">Score Distribution</h3>
+                    <a href="/analytics" class="text-indigo-600 text-xs font-semibold hover:text-indigo-700">Full Analytics →</a>
+                </div>
+                <div id="miniScoreChart" class="flex items-end gap-2 h-24 px-2">
+                    <div class="flex-1 skeleton rounded-t" style="height:30%"></div>
+                    <div class="flex-1 skeleton rounded-t" style="height:50%"></div>
+                    <div class="flex-1 skeleton rounded-t" style="height:70%"></div>
+                    <div class="flex-1 skeleton rounded-t" style="height:60%"></div>
+                    <div class="flex-1 skeleton rounded-t" style="height:40%"></div>
+                </div>
+            </div>
+
+            <!-- Completion Funnel Mini -->
+            <div class="glass rounded-2xl p-6">
+                <h3 class="font-bold text-slate-900 mb-4">Completion Funnel</h3>
+                <div id="miniFunnel" class="space-y-3">
+                    <div class="skeleton h-5 w-full rounded"></div>
+                    <div class="skeleton h-5 w-3/4 rounded"></div>
+                    <div class="skeleton h-5 w-1/2 rounded"></div>
+                </div>
+            </div>
+
+            <!-- Performance Summary -->
+            <div class="glass rounded-2xl p-6">
+                <h3 class="font-bold text-slate-900 mb-4">Performance</h3>
+                <div id="miniPerf" class="flex items-center gap-6">
+                    <div class="skeleton w-20 h-20 rounded-full"></div>
+                    <div class="space-y-2 flex-1">
+                        <div class="skeleton h-4 w-24 rounded"></div>
+                        <div class="skeleton h-4 w-20 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Quick Actions -->
         <div class="mt-10">
             <h3 class="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
@@ -697,10 +737,98 @@ function viewAssessment(id) {
     window.location.href = `/assessments/${id}`;
 }
 
+// Load mini analytics for dashboard
+async function loadMiniAnalytics() {
+    try {
+        const res = await fetch('/api/dashboard/analytics', { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const d = await res.json();
+
+        // Mini score chart
+        const ranges = ['0-20', '21-40', '41-60', '61-80', '81-100'];
+        const colors = ['#c7d2fe', '#a5b4fc', '#818cf8', '#6366f1', '#4338ca'];
+        const maxScore = Math.max(...Object.values(d.score_distribution), 1);
+        document.getElementById('miniScoreChart').innerHTML = ranges.map((r, i) => {
+            const v = d.score_distribution[r] || 0;
+            const h = v > 0 ? Math.max((v / maxScore) * 100, 8) : 3;
+            return `<div class="flex-1 flex flex-col items-center justify-end h-full">
+                <div class="w-full rounded-t-md transition-all" style="height:${h}%;background:${colors[i]}" title="${r}: ${v}"></div>
+                <p class="text-[10px] text-slate-400 mt-1">${r}</p>
+            </div>`;
+        }).join('');
+
+        // Mini funnel
+        const f = d.completion_funnel;
+        const max = Math.max(f.invited, 1);
+        const funnelItems = [
+            { label: 'Invited', value: f.invited, color: '#818cf8' },
+            { label: 'Completed', value: f.completed, color: '#10b981' },
+            { label: 'Passed', value: f.passed, color: '#6366f1' },
+        ];
+        document.getElementById('miniFunnel').innerHTML = funnelItems.map(s => {
+            const pct = Math.round(s.value / max * 100);
+            return `<div class="flex items-center gap-2">
+                <span class="text-xs text-slate-500 w-20">${s.label}</span>
+                <div class="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
+                    <div class="h-full rounded-full transition-all" style="width:${pct}%;background:${s.color}"></div>
+                </div>
+                <span class="text-xs font-bold w-8 text-right">${s.value}</span>
+            </div>`;
+        }).join('');
+
+        // Performance ring
+        const passRate = d.pass_rate;
+        const circumference = 2 * Math.PI * 32;
+        const offset = circumference * (1 - passRate / 100);
+        document.getElementById('miniPerf').innerHTML = `
+            <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="32" fill="none" stroke="#e2e8f0" stroke-width="6"/>
+                <circle cx="40" cy="40" r="32" fill="none" stroke="${passRate >= 70 ? '#10b981' : passRate >= 50 ? '#f59e0b' : '#ef4444'}" stroke-width="6" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" class="progress-ring"/>
+                <text x="40" y="37" text-anchor="middle" font-size="16" font-weight="800" fill="#1e293b">${passRate}%</text>
+                <text x="40" y="51" text-anchor="middle" font-size="9" fill="#94a3b8">pass rate</text>
+            </svg>
+            <div class="space-y-1">
+                <p class="text-sm"><span class="font-bold">${d.avg_score}%</span> <span class="text-slate-400">avg score</span></p>
+                <p class="text-sm"><span class="font-bold">${d.total_tests}</span> <span class="text-slate-400">tests</span></p>
+                <p class="text-sm"><span class="font-bold">${d.avg_time_minutes > 0 ? d.avg_time_minutes + 'm' : '-'}</span> <span class="text-slate-400">avg time</span></p>
+            </div>
+        `;
+    } catch (err) {
+        console.log('Mini analytics not available');
+    }
+}
+
 // Initialize
 loadDashboardStats();
 loadAssessments();
 loadActivity();
+loadMiniAnalytics();
+
+// Real-time updates via WebSocket
+(function() {
+    const script = document.createElement('script');
+    script.src = 'https://js.pusher.com/8.4.0/pusher.min.js';
+    script.onload = function() {
+        const wsToken = localStorage.getItem('token');
+        if (!wsToken || !user?.id) return;
+
+        const pusher = new Pusher('{{ env("REVERB_APP_KEY") }}', {
+            wsHost: '{{ env("REVERB_HOST", "localhost") }}',
+            wsPort: {{ env('REVERB_PORT', 8080) }},
+            wssPort: {{ env('REVERB_PORT', 8080) }},
+            forceTLS: {{ env('REVERB_SCHEME', 'http') === 'https' ? 'true' : 'false' }},
+            enabledTransports: ['ws', 'wss'],
+            cluster: '',
+            authEndpoint: '/broadcasting/auth',
+            auth: { headers: { 'Authorization': `Bearer ${wsToken}`, 'Accept': 'application/json' } }
+        });
+
+        const ch = pusher.subscribe('private-user.' + user.id);
+        ch.bind('App\\Events\\AssessmentUpdated', () => { loadDashboardStats(); loadAssessments(); });
+        ch.bind('App\\Events\\TestCompleted', () => { loadDashboardStats(); loadAssessments(); loadActivity(); });
+    };
+    document.head.appendChild(script);
+})();
 
 // Mobile menu
 function openMobileMenu() {

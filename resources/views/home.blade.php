@@ -255,7 +255,7 @@
             </h2>
         </div>
         
-        <div id="pricingGrid" class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div id="pricingGrid" class="flex flex-wrap justify-center gap-8 max-w-5xl mx-auto">
             <!-- Loading skeleton -->
             <div class="bg-white border border-slate-200 rounded-3xl p-8 animate-pulse">
                 <div class="h-6 bg-slate-200 rounded w-1/2 mb-4"></div>
@@ -311,7 +311,7 @@ async function loadPricingPlans() {
             
             if (isPopular) {
                 return `
-                <div class="relative bg-indigo-600 border border-indigo-500 rounded-3xl p-8 reveal-on-scroll scale-105 shadow-2xl">
+                <div class="relative bg-indigo-600 border border-indigo-500 rounded-3xl p-8 reveal-on-scroll scale-105 shadow-2xl w-full md:w-80 lg:w-96">
                     <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-indigo-600 text-sm font-bold px-4 py-1 rounded-full shadow">Most Popular</div>
                     <h3 class="text-xl font-bold text-white mb-2">${plan.name}</h3>
                     <p class="text-indigo-100 mb-6">Best value plan</p>
@@ -327,7 +327,7 @@ async function loadPricingPlans() {
             }
             
             return `
-            <div class="relative bg-white border border-slate-200 rounded-3xl p-8 reveal-on-scroll hover:shadow-lg transition-all">
+            <div class="relative bg-white border border-slate-200 rounded-3xl p-8 reveal-on-scroll hover:shadow-lg transition-all w-full md:w-80 lg:w-96">
                 <h3 class="text-xl font-bold text-slate-900 mb-2">${plan.name}</h3>
                 <p class="text-slate-500 mb-6">${plan.monthly_price == 0 ? 'Perfect for trying out' : 'For large teams'}</p>
                 <div class="mb-8">
@@ -369,7 +369,7 @@ loadPricingPlans();
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
                 </svg>
             </a>
-            <a href="#" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold text-lg hover:bg-slate-200 transition-all">
+            <a href="{{ route('contact') }}" class="inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold text-lg hover:bg-slate-200 transition-all">
                 Contact Us
             </a>
         </div>

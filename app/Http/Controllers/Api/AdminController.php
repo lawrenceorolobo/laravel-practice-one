@@ -120,8 +120,8 @@ class AdminController extends Controller
      */
     public function revenue(Request $request): JsonResponse
     {
-        // Total revenue
-        $totalRevenue = Payment::where('status', 'success')->sum('amount');
+        // Total + monthly revenue in one query
+        $totalRevenue = (float) DB::selectOne("SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE status = 'success'")->total;
 
         // Monthly revenue (last 12 months)
         $monthlyRevenue = Payment::where('status', 'success')
@@ -137,11 +137,18 @@ class AdminController extends Controller
             ->groupBy('billing_cycle')
             ->get();
 
-        // User stats
-        $totalUsers = User::count();
-        $activeSubscribers = User::where('subscription_status', 'active')->count();
-        $expiredSubscribers = User::where('subscription_status', 'expired')->count();
-        $neverSubscribed = User::where('subscription_status', 'none')->count();
+        // Consolidate 4 User::count() into 1 raw SQL
+        $userStats = DB::selectOne("SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN subscription_status = 'active' THEN 1 ELSE 0 END) as active_sub,
+            SUM(CASE WHEN subscription_status = 'expired' THEN 1 ELSE 0 END) as expired_sub,
+            SUM(CASE WHEN subscription_status = 'none' OR subscription_status IS NULL THEN 1 ELSE 0 END) as none_sub
+            FROM users WHERE deleted_at IS NULL");
+
+        $totalUsers = (int) $userStats->total;
+        $activeSubscribers = (int) $userStats->active_sub;
+        $expiredSubscribers = (int) $userStats->expired_sub;
+        $neverSubscribed = (int) $userStats->none_sub;
 
         // Recent payments
         $recentPayments = Payment::with('user:id,first_name,last_name,email')
@@ -215,152 +222,156 @@ class AdminController extends Controller
     }
 
     /**
-     * Platform overview dashboard
+     * Platform overview dashboard (cached 30s)
      */
     public function dashboard(): JsonResponse
     {
-        $lastMonth = now()->subMonth();
+        $data = cache()->remember('admin_dashboard', 30, function () {
+            $startOfMonth = now()->startOfMonth();
 
-        // Single query per table instead of multiple
-        $users = DB::selectOne("SELECT 
-            COUNT(*) as total,
-            SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as new_this_month,
-            SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-            SUM(CASE WHEN subscription_status = 'active' THEN 1 ELSE 0 END) as active_subscriptions
-            FROM users", [$lastMonth]);
+            $users = DB::selectOne("SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as new_this_month,
+                SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN subscription_status = 'active' THEN 1 ELSE 0 END) as active_subscriptions
+                FROM users", [$startOfMonth]);
 
-        $assessments = DB::selectOne("SELECT 
-            COUNT(*) as total,
-            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-            SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as this_month
-            FROM assessments", [$lastMonth]);
+            $assessments = DB::selectOne("SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as this_month
+                FROM assessments", [$startOfMonth]);
 
-        $revenue = DB::selectOne("SELECT 
-            COALESCE(SUM(CASE WHEN status = 'success' THEN amount ELSE 0 END), 0) as total,
-            COALESCE(SUM(CASE WHEN status = 'success' AND paid_at >= ? THEN amount ELSE 0 END), 0) as this_month
-            FROM payments", [$lastMonth]);
+            $revenue = DB::selectOne("SELECT 
+                COALESCE(SUM(CASE WHEN status = 'success' THEN amount ELSE 0 END), 0) as total,
+                COALESCE(SUM(CASE WHEN status = 'success' AND paid_at >= ? THEN amount ELSE 0 END), 0) as this_month
+                FROM payments", [$startOfMonth]);
 
-        return response()->json([
-            'users' => [
-                'total' => (int) $users->total,
-                'new_this_month' => (int) $users->new_this_month,
-                'active' => (int) $users->active,
-                'active_subscriptions' => (int) $users->active_subscriptions,
-            ],
-            'assessments' => [
-                'total' => (int) $assessments->total,
-                'active' => (int) $assessments->active,
-                'this_month' => (int) $assessments->this_month,
-            ],
-            'revenue' => [
-                'total' => (float) $revenue->total,
-                'this_month' => (float) $revenue->this_month,
-            ],
-        ]);
+            return [
+                'users' => [
+                    'total' => (int) $users->total,
+                    'new_this_month' => (int) $users->new_this_month,
+                    'active' => (int) $users->active,
+                    'active_subscriptions' => (int) $users->active_subscriptions,
+                ],
+                'assessments' => [
+                    'total' => (int) $assessments->total,
+                    'active' => (int) $assessments->active,
+                    'this_month' => (int) $assessments->this_month,
+                ],
+                'revenue' => [
+                    'total' => (float) $revenue->total,
+                    'this_month' => (float) $revenue->this_month,
+                ],
+            ];
+        });
+
+        return response()->json($data);
     }
 
     /**
-     * Dashboard analytics - monthly trends for charts
+     * Dashboard analytics - monthly trends for charts (cached 30s)
      */
     public function dashboardAnalytics(): JsonResponse
     {
-        $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
+        $data = cache()->remember('admin_dashboard_analytics', 30, function () {
+            $sixMonthsAgo = now()->subMonths(5)->startOfMonth();
 
-        // Build labels
-        $labels = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $labels[] = now()->subMonths($i)->format('M Y');
-        }
+            // Build labels
+            $labels = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $labels[] = now()->subMonths($i)->format('M Y');
+            }
 
-        // Monthly user registrations — single GROUP BY query
-        $userRows = DB::select(
-            "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
-             FROM users WHERE created_at >= ? AND deleted_at IS NULL
-             GROUP BY month ORDER BY month",
-            [$sixMonthsAgo]
-        );
-        $userMap = collect($userRows)->pluck('cnt', 'month');
+            // Monthly user registrations — single GROUP BY query
+            $userRows = DB::select(
+                "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
+                 FROM users WHERE created_at >= ? AND deleted_at IS NULL
+                 GROUP BY month ORDER BY month",
+                [$sixMonthsAgo]
+            );
+            $userMap = collect($userRows)->pluck('cnt', 'month');
 
-        // Monthly assessments — single GROUP BY query
-        $assessmentRows = DB::select(
-            "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
-             FROM assessments WHERE created_at >= ?
-             GROUP BY month ORDER BY month",
-            [$sixMonthsAgo]
-        );
-        $assessmentMap = collect($assessmentRows)->pluck('cnt', 'month');
+            // Monthly assessments — single GROUP BY query
+            $assessmentRows = DB::select(
+                "SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as cnt
+                 FROM assessments WHERE created_at >= ?
+                 GROUP BY month ORDER BY month",
+                [$sixMonthsAgo]
+            );
+            $assessmentMap = collect($assessmentRows)->pluck('cnt', 'month');
 
-        // Monthly revenue — single GROUP BY query
-        $revenueRows = DB::select(
-            "SELECT DATE_FORMAT(paid_at, '%Y-%m') as month, SUM(amount) as total
-             FROM payments WHERE status = 'success' AND paid_at >= ?
-             GROUP BY month ORDER BY month",
-            [$sixMonthsAgo]
-        );
-        $revenueMap = collect($revenueRows)->pluck('total', 'month');
+            // Monthly revenue — single GROUP BY query
+            $revenueRows = DB::select(
+                "SELECT DATE_FORMAT(paid_at, '%Y-%m') as month, SUM(amount) as total
+                 FROM payments WHERE status = 'success' AND paid_at >= ?
+                 GROUP BY month ORDER BY month",
+                [$sixMonthsAgo]
+            );
+            $revenueMap = collect($revenueRows)->pluck('total', 'month');
 
-        // Fill arrays for 6 months
-        $userTrend = [];
-        $assessmentTrend = [];
-        $revenueTrend = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $key = now()->subMonths($i)->format('Y-m');
-            $userTrend[] = (int) ($userMap[$key] ?? 0);
-            $assessmentTrend[] = (int) ($assessmentMap[$key] ?? 0);
-            $revenueTrend[] = (float) ($revenueMap[$key] ?? 0);
-        }
+            // Fill arrays for 6 months
+            $userTrend = [];
+            $assessmentTrend = [];
+            $revenueTrend = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $key = now()->subMonths($i)->format('Y-m');
+                $userTrend[] = (int) ($userMap[$key] ?? 0);
+                $assessmentTrend[] = (int) ($assessmentMap[$key] ?? 0);
+                $revenueTrend[] = (float) ($revenueMap[$key] ?? 0);
+            }
 
-        // Test session stats from invitees table (aligned with reports)
-        $testStats = DB::selectOne("SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-            SUM(CASE WHEN status = 'pending' OR status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
-            SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as timed_out
-            FROM invitees");
+            // Merge testStats + avgScore into single query (was 2 separate queries)
+            $testStats = DB::selectOne("SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN i.status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN i.status IN ('pending','in_progress') THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN i.status = 'expired' THEN 1 ELSE 0 END) as timed_out,
+                (SELECT ROUND(AVG(percentage), 1) FROM test_sessions WHERE percentage IS NOT NULL) as avg_score
+                FROM invitees i");
 
-        // Average score from test_sessions
-        $avgScore = DB::selectOne("SELECT ROUND(AVG(percentage), 1) as avg
-            FROM test_sessions WHERE percentage IS NOT NULL");
+            // Plan distribution from payments + subscription_plans
+            $planDistribution = DB::select(
+                "SELECT sp.name as plan, COUNT(DISTINCT p.user_id) as count
+                 FROM payments p
+                 JOIN subscription_plans sp ON sp.id = p.plan_id
+                 WHERE p.status = 'success'
+                 GROUP BY sp.name
+                 ORDER BY count DESC"
+            );
 
-        // Plan distribution from payments + subscription_plans
-        $planDistribution = DB::select(
-            "SELECT sp.name as plan, COUNT(DISTINCT p.user_id) as count
-             FROM payments p
-             JOIN subscription_plans sp ON sp.id = p.plan_id
-             WHERE p.status = 'success'
-             GROUP BY sp.name
-             ORDER BY count DESC"
-        );
+            // Count users without any successful payment as 'Free'
+            $paidUserCount = (int) DB::selectOne(
+                "SELECT COUNT(DISTINCT user_id) as cnt FROM payments WHERE status = 'success'"
+            )->cnt;
+            $totalUsers = (int) DB::selectOne("SELECT COUNT(*) as cnt FROM users WHERE deleted_at IS NULL")->cnt;
+            $freeUsers = $totalUsers - $paidUserCount;
 
-        // Count users without any successful payment as 'Free'
-        $paidUserCount = (int) DB::selectOne(
-            "SELECT COUNT(DISTINCT user_id) as cnt FROM payments WHERE status = 'success'"
-        )->cnt;
-        $totalUsers = (int) DB::selectOne("SELECT COUNT(*) as cnt FROM users WHERE deleted_at IS NULL")->cnt;
-        $freeUsers = $totalUsers - $paidUserCount;
+            $plans = collect($planDistribution)->map(fn($p) => [
+                'plan' => $p->plan, 'count' => (int) $p->count
+            ])->values()->toArray();
 
-        $plans = collect($planDistribution)->map(fn($p) => [
-            'plan' => $p->plan, 'count' => (int) $p->count
-        ])->values()->toArray();
+            if ($freeUsers > 0) {
+                array_unshift($plans, ['plan' => 'Free', 'count' => $freeUsers]);
+            }
 
-        if ($freeUsers > 0) {
-            array_unshift($plans, ['plan' => 'Free', 'count' => $freeUsers]);
-        }
+            return [
+                'labels' => $labels,
+                'users' => $userTrend,
+                'assessments' => $assessmentTrend,
+                'revenue' => $revenueTrend,
+                'test_sessions' => [
+                    'total' => (int) ($testStats->total ?? 0),
+                    'completed' => (int) ($testStats->completed ?? 0),
+                    'in_progress' => (int) ($testStats->in_progress ?? 0),
+                    'timed_out' => (int) ($testStats->timed_out ?? 0),
+                    'avg_score' => (float) ($testStats->avg_score ?? 0),
+                ],
+                'plan_distribution' => $plans,
+            ];
+        });
 
-        return response()->json([
-            'labels' => $labels,
-            'users' => $userTrend,
-            'assessments' => $assessmentTrend,
-            'revenue' => $revenueTrend,
-            'test_sessions' => [
-                'total' => (int) ($testStats->total ?? 0),
-                'completed' => (int) ($testStats->completed ?? 0),
-                'in_progress' => (int) ($testStats->in_progress ?? 0),
-                'timed_out' => (int) ($testStats->timed_out ?? 0),
-                'avg_score' => (float) ($avgScore->avg ?? 0),
-            ],
-            'plan_distribution' => $plans,
-        ]);
+        return response()->json($data);
     }
 
     /**
@@ -375,29 +386,31 @@ class AdminController extends Controller
             $prevFromDate = $fromDate->copy()->subDays($periodDays);
             $prevToDate = $fromDate->copy()->subSecond();
 
-            // Current period stats
-            $currentRevenue = Payment::where('status', 'success')
-                ->whereBetween('paid_at', [$fromDate, $toDate])
-                ->sum('amount') ?? 0;
-            $currentNewUsers = User::whereBetween('created_at', [$fromDate, $toDate])->count();
-            $currentAssessments = Assessment::whereBetween('created_at', [$fromDate, $toDate])->count();
-            
-            // Count completed tests using updated_at as proxy for completion time
-            $currentTestsCompleted = DB::table('invitees')
-                ->where('status', 'completed')
-                ->whereBetween('updated_at', [$fromDate, $toDate])
-                ->count();
+            // Consolidate 8 separate count queries into 2 raw SQL (current + previous period)
+            $currentStats = DB::selectOne("
+                SELECT
+                    COALESCE((SELECT SUM(amount) FROM payments WHERE status = 'success' AND paid_at BETWEEN ? AND ?), 0) as revenue,
+                    (SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ? AND deleted_at IS NULL) as new_users,
+                    (SELECT COUNT(*) FROM assessments WHERE created_at BETWEEN ? AND ?) as assessments,
+                    (SELECT COUNT(*) FROM invitees WHERE status = 'completed' AND updated_at BETWEEN ? AND ?) as tests_completed
+            ", [$fromDate, $toDate, $fromDate, $toDate, $fromDate, $toDate, $fromDate, $toDate]);
 
-            // Previous period for comparison
-            $prevRevenue = Payment::where('status', 'success')
-                ->whereBetween('paid_at', [$prevFromDate, $prevToDate])
-                ->sum('amount') ?? 0;
-            $prevNewUsers = User::whereBetween('created_at', [$prevFromDate, $prevToDate])->count();
-            $prevAssessments = Assessment::whereBetween('created_at', [$prevFromDate, $prevToDate])->count();
-            $prevTests = DB::table('invitees')
-                ->where('status', 'completed')
-                ->whereBetween('updated_at', [$prevFromDate, $prevToDate])
-                ->count();
+            $prevStats = DB::selectOne("
+                SELECT
+                    COALESCE((SELECT SUM(amount) FROM payments WHERE status = 'success' AND paid_at BETWEEN ? AND ?), 0) as revenue,
+                    (SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ? AND deleted_at IS NULL) as new_users,
+                    (SELECT COUNT(*) FROM assessments WHERE created_at BETWEEN ? AND ?) as assessments,
+                    (SELECT COUNT(*) FROM invitees WHERE status = 'completed' AND updated_at BETWEEN ? AND ?) as tests_completed
+            ", [$prevFromDate, $prevToDate, $prevFromDate, $prevToDate, $prevFromDate, $prevToDate, $prevFromDate, $prevToDate]);
+
+            $currentRevenue = (float) $currentStats->revenue;
+            $currentNewUsers = (int) $currentStats->new_users;
+            $currentAssessments = (int) $currentStats->assessments;
+            $currentTestsCompleted = (int) $currentStats->tests_completed;
+            $prevRevenue = (float) $prevStats->revenue;
+            $prevNewUsers = (int) $prevStats->new_users;
+            $prevAssessments = (int) $prevStats->assessments;
+            $prevTests = (int) $prevStats->tests_completed;
 
             // Calculate percentage changes
             $calcChange = fn($curr, $prev) => $prev > 0 ? round((($curr - $prev) / $prev) * 100, 1) : ($curr > 0 ? 100 : 0);
@@ -578,6 +591,7 @@ class AdminController extends Controller
         $validated['annual_discount_percent'] = $validated['annual_discount_percent'] ?? 15.00;
 
         $plan = SubscriptionPlan::create($validated);
+        cache()->forget('subscription_plans');
 
         return response()->json([
             'message' => 'Subscription plan created successfully.',
@@ -601,6 +615,7 @@ class AdminController extends Controller
         ]);
 
         $plan->update($validated);
+        cache()->forget('subscription_plans');
 
         return response()->json([
             'message' => 'Subscription plan updated successfully.',
@@ -627,6 +642,7 @@ class AdminController extends Controller
         }
 
         $plan->delete();
+        cache()->forget('subscription_plans');
 
         return response()->json(['message' => 'Subscription plan deleted successfully.']);
     }
@@ -667,7 +683,8 @@ class AdminController extends Controller
         $assessment = Assessment::with([
             'user:id,first_name,last_name,email,company_name',
             'questions.options',
-            'invitees.testSession.answers',
+            'invitees:id,assessment_id,email,first_name,last_name,status',
+            'invitees.testSession:id,invitee_id,status,percentage,passed,total_score,max_score,time_spent_seconds',
         ])
         ->withCount(['invitees', 'invitees as completed_count' => fn($q) => $q->where('status', 'completed')])
         ->withAvg(['testSessions as avg_score' => fn($q) => $q->whereIn('status', ['submitted', 'completed', 'timed_out'])], 'percentage')
@@ -713,6 +730,9 @@ class AdminController extends Controller
     {
         $flag = FeatureFlag::findOrFail($id);
         $flag->update(['enabled' => !$flag->enabled]);
+
+        // Flush feature flag cache so changes take effect immediately
+        cache()->forget('feature_flags');
 
         logger()->info('Admin toggled feature flag', [
             'admin_id' => $request->user()->id,

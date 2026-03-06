@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\InviteeUpdated;
 use App\Mail\InvitationMail;
 use App\Models\Assessment;
 use App\Models\Invitee;
@@ -41,6 +42,7 @@ class SendInvitationBatchJob implements ShouldQueue
                             'email_status' => 'sent',
                             'email_sent_at' => now(),
                         ]);
+                        broadcast(new InviteeUpdated($this->assessmentId, 'email_sent'));
                     } catch (\Exception $e) {
                         $invitee->update(['email_status' => 'failed']);
                         Log::warning("Failed to send invitation to {$invitee->email}: " . $e->getMessage());

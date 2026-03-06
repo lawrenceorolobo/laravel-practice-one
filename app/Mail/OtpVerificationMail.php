@@ -22,6 +22,10 @@ class OtpVerificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: new \Illuminate\Mail\Mailables\Address(
+                env('MAIL_AUTH_FROM', config('mail.from.address')),
+                env('MAIL_AUTH_NAME', config('mail.from.name'))
+            ),
             subject: 'Your Quizly verification code: ' . $this->otp,
         );
     }

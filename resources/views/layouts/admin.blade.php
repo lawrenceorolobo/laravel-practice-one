@@ -470,7 +470,52 @@
         document.getElementById('confirmModal').classList.remove('flex');
         if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
     }
-</script>
+    </script>
+
+    <!-- Pusher-JS CDN for Reverb WebSocket -->
+    <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+    <script>
+    // ─── Real-time via Reverb (Pusher-compatible) ───
+    const QuizlyEcho = (() => {
+        const wsToken = localStorage.getItem('adminToken');
+        if (!wsToken) return { private(){ return { listen(){ return this; } }; } };
+
+        const pusher = new Pusher('{{ env("REVERB_APP_KEY") }}', {
+            wsHost: '{{ env("REVERB_HOST", "localhost") }}',
+            wsPort: {{ env('REVERB_PORT', 8080) }},
+            wssPort: {{ env('REVERB_PORT', 8080) }},
+            forceTLS: {{ env('REVERB_SCHEME', 'http') === 'https' ? 'true' : 'false' }},
+            enabledTransports: ['ws', 'wss'],
+            cluster: '',
+            authEndpoint: '/broadcasting/auth',
+            auth: {
+                headers: {
+                    'Authorization': `Bearer ${wsToken}`,
+                    'Accept': 'application/json',
+                }
+            }
+        });
+
+        return {
+            private(channel) {
+                const ch = pusher.subscribe('private-' + channel);
+                return {
+                    listen(event, callback) {
+                        ch.bind('App\\Events\\' + event, callback);
+                        return this;
+                    },
+                    stopListening(event) {
+                        ch.unbind('App\\Events\\' + event);
+                        return this;
+                    }
+                };
+            },
+            leave(channel) {
+                pusher.unsubscribe('private-' + channel);
+            }
+        };
+    })();
+    </script>
 
 <!-- Confirm Modal -->
 <div id="confirmModal" class="hidden fixed inset-0 z-[110] items-center justify-center p-4" style="background: var(--overlay); backdrop-filter: blur(8px);" onclick="if(event.target===this) closeConfirmModal(false)">

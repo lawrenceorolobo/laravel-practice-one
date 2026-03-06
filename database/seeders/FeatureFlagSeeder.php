@@ -26,7 +26,7 @@ class FeatureFlagSeeder extends Seeder
 
             // Communication
             ['key' => 'email_notifications', 'name' => 'Email Notifications', 'description' => 'Send email notifications to users', 'category' => 'communication', 'enabled' => true],
-            ['key' => 'send_answers_to_taker', 'name' => 'Candidate Answer Reports', 'description' => 'Allow sending detailed answer PDFs to candidates', 'category' => 'communication', 'enabled' => true],
+            ['key' => 'send_answers_to_taker', 'name' => 'Candidate Answer Reports', 'description' => 'Allow sending detailed answer PDFs to candidates', 'category' => 'communication', 'enabled' => false],
 
             // Auth
             ['key' => 'google_oauth', 'name' => 'Google OAuth', 'description' => 'Enable Google sign-in', 'category' => 'auth', 'enabled' => true],

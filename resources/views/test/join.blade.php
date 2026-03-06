@@ -92,7 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function validateAccess() {
     try {
-        const res = await fetch(`/api/test/access/${ACCESS_CODE}`);
+        const res = await fetch(`/api/test/access/${ACCESS_CODE}`, {
+            headers: { 'Accept': 'application/json' }
+        });
         const data = await res.json();
 
         if (!res.ok || !data.valid) {
@@ -137,7 +139,7 @@ document.getElementById('joinForm').addEventListener('submit', async (e) => {
     try {
         const res = await fetch(`/api/test/join/${ACCESS_CODE}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
                 first_name: document.getElementById('firstName').value.trim(),
                 last_name: document.getElementById('lastName').value.trim(),

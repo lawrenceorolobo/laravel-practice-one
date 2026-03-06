@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\InviteeUpdated;
+use App\Events\TestCompleted;
 use App\Http\Controllers\Controller;
 use App\Models\Assessment;
 use App\Models\Invitee;
@@ -25,7 +27,7 @@ class TestController extends Controller
     public function validateToken(Request $request, string $token): JsonResponse
     {
         $invitee = Invitee::where('invite_token', $token)
-            ->with('assessment:id,title,description,duration_minutes,start_datetime,end_datetime,status')
+            ->with(['assessment:id,title,description,duration_minutes,start_datetime,end_datetime,status', 'testSession'])
             ->firstOrFail();
 
         // Mark as opened if first time
@@ -202,7 +204,7 @@ class TestController extends Controller
     public function getQuestions(Request $request, string $token): JsonResponse
     {
         $invitee = Invitee::where('invite_token', $token)
-            ->with(['assessment.questions.options', 'testSession'])
+            ->with(['assessment.questions.options', 'testSession.answers:id,session_id,question_id'])
             ->firstOrFail();
 
         $session = $invitee->testSession;
@@ -231,8 +233,8 @@ class TestController extends Controller
             $questions = $questions->shuffle();
         }
 
-        // Get answered question IDs
-        $answeredIds = $session->answers()->pluck('question_id')->toArray();
+        // Get answered question IDs (preloaded via eager-load)
+        $answeredIds = $session->answers->pluck('question_id')->toArray();
 
         $questionsData = $questions->map(function ($q) use ($assessment, $answeredIds) {
             $options = $q->options;
@@ -260,6 +262,7 @@ class TestController extends Controller
             'answered' => count($answeredIds),
             'time_remaining' => max(0, $timeLimit - $timeSpent),
             'allow_back_navigation' => $assessment->allow_back_navigation,
+            'question_navigation' => feature('question_navigation'),
         ]);
     }
 
@@ -279,7 +282,8 @@ class TestController extends Controller
         ]);
 
         $invitee = Invitee::where('invite_token', $token)
-            ->with(['testSession', 'assessment'])
+            ->select(['id', 'invite_token', 'assessment_id', 'status'])
+            ->with(['testSession:id,invitee_id,status,started_at', 'assessment:id,duration_minutes'])
             ->firstOrFail();
 
         $session = $invitee->testSession;
@@ -332,7 +336,7 @@ class TestController extends Controller
 
         return response()->json([
             'message' => 'Answer saved.',
-            'answered' => $session->answers()->count(),
+            'answered' => DB::table('test_answers')->where('session_id', $session->id)->count(),
         ]);
     }
 
@@ -369,21 +373,33 @@ class TestController extends Controller
             ];
         }
 
-        // Send separate result emails (queued)
-        $assessment = $invitee->assessment->load('user');
-        dispatch(function () use ($assessment, $invitee, $session) {
-            try {
-                // Email to assessment creator (business admin)
-                $ownerMail = new \App\Mail\AssessmentResultMail($assessment, $invitee, $session);
-                \Illuminate\Support\Facades\Mail::to($assessment->user->email)->send($ownerMail);
+        // Send separate result emails (queued) — only if email notifications enabled
+        if (feature('email_notifications')) {
+            $assessment = $invitee->assessment->load('user');
+            dispatch(function () use ($assessment, $invitee, $session) {
+                try {
+                    // Email to assessment creator (business admin)
+                    $ownerMail = new \App\Mail\AssessmentResultMail($assessment, $invitee, $session);
+                    \Illuminate\Support\Facades\Mail::to($assessment->user->email)->send($ownerMail);
 
-                // Separate email to candidate (test taker)
-                $candidateMail = new \App\Mail\CandidateResultMail($assessment, $invitee, $session);
-                \Illuminate\Support\Facades\Mail::to($invitee->email)->send($candidateMail);
-            } catch (\Exception $e) {
-                \Log::warning("Result email failed: " . $e->getMessage());
-            }
-        });
+                    // Separate email to candidate (only if flag enabled)
+                    if (feature('send_answers_to_taker')) {
+                        $candidateMail = new \App\Mail\CandidateResultMail($assessment, $invitee, $session);
+                        \Illuminate\Support\Facades\Mail::to($invitee->email)->send($candidateMail);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning("Result email failed: " . $e->getMessage());
+                }
+            });
+        }
+
+        // Broadcast real-time update
+        broadcast(new TestCompleted(
+            $invitee->assessment_id,
+            $assessment->user_id,
+            $invitee->email
+        ));
+        broadcast(new InviteeUpdated($invitee->assessment_id, 'completed'));
 
         return response()->json($result);
     }
@@ -393,6 +409,10 @@ class TestController extends Controller
      */
     public function logProctoringEvent(Request $request, string $token): JsonResponse
     {
+        if (!feature('proctoring_enabled')) {
+            return response()->json(['message' => 'Event logged.']);
+        }
+
         $validated = $request->validate([
             'event_type' => ['required', 'in:tab_switch,fullscreen_exit'],
         ]);
@@ -541,6 +561,10 @@ class TestController extends Controller
      */
     public function saveRecording(Request $request, string $token): JsonResponse
     {
+        if (!feature('webcam_recording')) {
+            return response()->json(['message' => 'Recording saved.']);
+        }
+
         $invitee = Invitee::where('invite_token', $token)->firstOrFail();
         $session = TestSession::where('invitee_id', $invitee->id)
             ->where('status', 'in_progress')

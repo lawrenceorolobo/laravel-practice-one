@@ -63,13 +63,20 @@
 <!-- Recent Transactions -->
 <div class="panel">
     <div class="px-4 lg:px-5 py-3 flex items-center justify-between" style="border-bottom:1px solid var(--border);">
-        <div><h3 class="text-[13px] font-semibold" style="color:var(--text-primary);">Recent Transactions</h3><p class="text-[10px] mt-0.5" style="color:var(--text-muted);">Click row for details</p></div>
-        <span class="text-[11px] font-medium" style="color:var(--text-muted);" id="transactionCount">Loading...</span>
+        <div><h3 class="text-[13px] font-semibold" style="color:var(--text-primary);">Recent Transactions</h3><p class="text-[10px] mt-0.5" style="color:var(--text-muted);">Select rows to export</p></div>
+        <div class="flex items-center gap-2">
+            <button id="exportSelectedBtn" onclick="exportSelectedCSV()" class="btn-primary text-[11px] px-3 py-1.5 hidden items-center gap-1.5" style="font-size:11px;">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Export Selected
+            </button>
+            <span class="text-[11px] font-medium" style="color:var(--text-muted);" id="transactionCount">Loading...</span>
+        </div>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full">
             <thead>
                 <tr style="border-bottom:1px solid var(--border);background:var(--bg-alt);">
+                    <th class="px-3 py-2.5 w-8"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" class="rounded" style="accent-color:#6366f1;"></th>
                     <th class="text-left px-4 lg:px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider" style="color:var(--text-muted);">Ref</th>
                     <th class="text-left px-4 lg:px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider hidden sm:table-cell" style="color:var(--text-muted);">User</th>
                     <th class="text-left px-4 lg:px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider hidden md:table-cell" style="color:var(--text-muted);">Plan</th>
@@ -185,13 +192,14 @@
         tbody.innerHTML = transactions.map((txn, i) => {
             const ci = i % 6;
             const initial = (txn.user_name||'U').charAt(0).toUpperCase();
-            return `<tr class="tr-click" style="border-bottom:1px solid var(--border-subtle);" onclick='openTxnDrawer(${JSON.stringify(txn)})'>
-                <td class="px-4 lg:px-5 py-2.5 font-mono text-[11px] font-medium" style="color:var(--text-primary);">#${txn.reference}</td>
-                <td class="px-4 lg:px-5 py-2.5 hidden sm:table-cell"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style="background:linear-gradient(135deg,${avatarColors[ci]},${avatarGrads[ci]});">${initial}</div><span class="text-[12px] truncate max-w-[100px]" style="color:var(--text-secondary);">${txn.user_name}</span></div></td>
-                <td class="px-4 lg:px-5 py-2.5 hidden md:table-cell"><span class="badge badge-neutral">${txn.plan}</span></td>
-                <td class="px-4 lg:px-5 py-2.5 font-semibold text-[12px]" style="color:var(--text-primary);">₦${txn.amount.toLocaleString()}</td>
-                <td class="px-4 lg:px-5 py-2.5 hidden lg:table-cell"><span class="badge ${txn.status==='success'?'badge-success':txn.status==='failed'?'badge-danger':'badge-warning'}"><span class="w-1.5 h-1.5 rounded-full" style="background:${txn.status==='success'?'#10b981':txn.status==='failed'?'#ef4444':'#f59e0b'}"></span>${txn.status}</span></td>
-                <td class="px-4 lg:px-5 py-2.5 text-[11px] hidden sm:table-cell" style="color:var(--text-muted);">${txn.date}</td>
+            return `<tr class="tr-click" style="border-bottom:1px solid var(--border-subtle);">
+                <td class="px-3 py-2.5" onclick="event.stopPropagation()"><input type="checkbox" class="txn-check rounded" data-idx="${i}" onchange="updateExportBtn()" style="accent-color:#6366f1;"></td>
+                <td class="px-4 lg:px-5 py-2.5 font-mono text-[11px] font-medium" style="color:var(--text-primary);" onclick='openTxnDrawer(${JSON.stringify(txn)})'>#${txn.reference}</td>
+                <td class="px-4 lg:px-5 py-2.5 hidden sm:table-cell" onclick='openTxnDrawer(${JSON.stringify(txn)})'><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style="background:linear-gradient(135deg,${avatarColors[ci]},${avatarGrads[ci]});">${initial}</div><span class="text-[12px] truncate max-w-[100px]" style="color:var(--text-secondary);">${txn.user_name}</span></div></td>
+                <td class="px-4 lg:px-5 py-2.5 hidden md:table-cell" onclick='openTxnDrawer(${JSON.stringify(txn)})'><span class="badge badge-neutral">${txn.plan}</span></td>
+                <td class="px-4 lg:px-5 py-2.5 font-semibold text-[12px]" style="color:var(--text-primary);" onclick='openTxnDrawer(${JSON.stringify(txn)})'>₦${txn.amount.toLocaleString()}</td>
+                <td class="px-4 lg:px-5 py-2.5 hidden lg:table-cell" onclick='openTxnDrawer(${JSON.stringify(txn)})'><span class="badge ${txn.status==='success'?'badge-success':txn.status==='failed'?'badge-danger':'badge-warning'}"><span class="w-1.5 h-1.5 rounded-full" style="background:${txn.status==='success'?'#10b981':txn.status==='failed'?'#ef4444':'#f59e0b'}"></span>${txn.status}</span></td>
+                <td class="px-4 lg:px-5 py-2.5 text-[11px] hidden sm:table-cell" style="color:var(--text-muted);" onclick='openTxnDrawer(${JSON.stringify(txn)})'>${txn.date}</td>
             </tr>`;
         }).join('');
     }
@@ -254,6 +262,48 @@
             renderUserChart(reportData.charts.user_growth);
         }
     });
+
+    function toggleSelectAll(el) {
+        document.querySelectorAll('.txn-check').forEach(cb => cb.checked = el.checked);
+        updateExportBtn();
+    }
+
+    function updateExportBtn() {
+        const checked = document.querySelectorAll('.txn-check:checked').length;
+        const btn = document.getElementById('exportSelectedBtn');
+        if (checked > 0) {
+            btn.classList.remove('hidden');
+            btn.classList.add('flex');
+            btn.querySelector('span') || (btn.innerHTML = btn.innerHTML.replace('Export Selected', `Export Selected (${checked})`));
+            btn.textContent = '';
+            btn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Export Selected (${checked})`;
+        } else {
+            btn.classList.add('hidden');
+            btn.classList.remove('flex');
+        }
+    }
+
+    function exportSelectedCSV() {
+        const checks = document.querySelectorAll('.txn-check:checked');
+        if (!checks.length || !reportData?.transactions) return;
+
+        const indices = Array.from(checks).map(c => parseInt(c.dataset.idx));
+        const selected = indices.map(i => reportData.transactions[i]).filter(Boolean);
+
+        const header = 'Reference,User,Email,Plan,Amount,Status,Date';
+        const rows = selected.map(t =>
+            `"${t.reference}","${t.user_name}","${t.user_email||''}","${t.plan}",${t.amount},"${t.status}","${t.date}"`
+        );
+        const csv = [header, ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `transactions_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toastSuccess('Exported ' + selected.length + ' transactions');
+    }
 
     loadReports();
 </script>

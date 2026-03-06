@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quizly — Deployment & Infrastructure Plan</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #1a1a2e;
+            line-height: 1.7;
+            background: #fff;
+            font-size: 14px;
+        }
+
+        .page {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 48px 56px;
+        }
+
+        @media print {
+            body { font-size: 12px; }
+            .page { padding: 20px 40px; max-width: 100%; }
+            .page-break { page-break-before: always; }
+            .no-print { display: none; }
+            h2 { page-break-after: avoid; }
+            table { page-break-inside: avoid; }
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding-bottom: 32px;
+            border-bottom: 3px solid #4f46e5;
+            margin-bottom: 36px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a2e;
+            letter-spacing: -0.5px;
+        }
+        .header .subtitle {
+            font-size: 16px;
+            color: #64748b;
+            margin-top: 6px;
+        }
+        .header .date {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+
+        /* Sections */
+        h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #4f46e5;
+            margin: 32px 0 14px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 20px 0 8px;
+        }
+
+        p {
+            margin-bottom: 10px;
+            color: #334155;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 16px;
+            font-size: 13px;
+        }
+        th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+        }
+        tr:last-child td { border-bottom: none; }
+        .total-row td {
+            font-weight: 700;
+            color: #1a1a2e;
+            border-top: 2px solid #cbd5e1;
+        }
+
+        /* Callout boxes */
+        .callout {
+            background: #f8fafc;
+            border-left: 4px solid #4f46e5;
+            padding: 12px 16px;
+            margin: 14px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            color: #475569;
+        }
+        .callout.warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        .callout.success {
+            border-left-color: #10b981;
+            background: #ecfdf5;
+        }
+
+        /* Steps */
+        .step {
+            display: flex;
+            gap: 14px;
+            margin: 12px 0;
+        }
+        .step-num {
+            width: 28px;
+            height: 28px;
+            background: #4f46e5;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .step-content h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        .step-content ul {
+            margin-left: 16px;
+            color: #475569;
+            font-size: 13px;
+        }
+        .step-content li { margin-bottom: 3px; }
+
+        /* Summary card */
+        .summary-card {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: #fff;
+            border-radius: 12px;
+            padding: 24px 28px;
+            margin: 20px 0;
+        }
+        .summary-card h3 { color: #fff; margin-top: 0; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 14px;
+        }
+        .summary-item .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+        .summary-item .value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        /* Print button */
+        .print-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #4f46e5;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+        }
+        .print-btn:hover { background: #4338ca; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-recommended { background: #ecfdf5; color: #059669; }
+        .badge-alternative { background: #fef3c7; color: #d97706; }
+        .badge-free { background: #eff6ff; color: #2563eb; }
+    </style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">📄 Save as PDF</button>
+
+<div class="page">
+    <div class="header">
+        <h1>Quizly Assessment Platform</h1>
+        <div class="subtitle">Deployment & Infrastructure Plan</div>
+        <div class="date">Prepared — March 2026</div>
+    </div>
+
+    <h2>Overview</h2>
+    <p>
+        This document covers everything needed to take Quizly from development to production. It breaks down each service, why it's needed, what it costs, and the full deployment sequence. The stack is built around Namecheap for domain, hosting, and email — keeping everything under one roof for simpler management.
+    </p>
+
+    <div class="callout warning">
+        <strong>Why not shared hosting?</strong> Quizly uses WebSockets (Laravel Reverb) for real-time updates — when a candidate submits a test, the dashboard updates instantly. Shared hosting blocks the port binding that WebSockets require. A VPS is the minimum requirement for this feature to work, and it's actually cheaper than most shared plans when you factor in what you get.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>1. Domain Name</h2>
+    <p>The web address users will visit. Purchased and managed through Namecheap.</p>
+
+    <table>
+        <tr><th>Item</th><th>Provider</th><th>First Year</th><th>Renewal/yr</th></tr>
+        <tr><td>.com domain registration</td><td>Namecheap</td><td>~$11.28</td><td>~$18.48/yr</td></tr>
+        <tr><td>WhoisGuard (domain privacy)</td><td>Namecheap</td><td>Free</td><td>Free</td></tr>
+        <tr class="total-row"><td colspan="2"><strong>Domain Total</strong></td><td><strong>~$11</strong></td><td><strong>~$18/yr</strong></td></tr>
+    </table>
+
+    <div class="callout">
+        If the .com name you want is taken, alternatives like .io (~$30/yr) or .app (~$15/yr) are solid choices. We can check availability together before purchasing.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>2. Server Hosting</h2>
+    <p>This runs the entire application — PHP, Laravel, MySQL database, the queue workers, and the WebSocket server for real-time updates.</p>
+
+    <h3>Recommended: Namecheap VPS — Pulsar Plan <span class="badge badge-recommended">Recommended</span></h3>
+    <table>
+        <tr><th>Spec</th><th>Details</th></tr>
+        <tr><td>CPU</td><td>2 Cores</td></tr>
+        <tr><td>RAM</td><td>2 GB</td></tr>
+        <tr><td>Storage</td><td>40 GB SSD (RAID 10)</td></tr>
+        <tr><td>Bandwidth</td><td>1 TB/month</td></tr>
+        <tr><td>Root Access</td><td>Full (SSH)</td></tr>
+        <tr><td>OS</td><td>Ubuntu 24.04 LTS</td></tr>
+        <tr class="total-row"><td><strong>Monthly Cost</strong></td><td><strong>$6.88/mo</strong></td></tr>
+    </table>
+
+    <div class="callout success">
+        This handles up to 500+ concurrent users comfortably. If traffic grows significantly, upgrade to the Quasar plan (4 CPU, 6GB RAM, 120GB SSD) at $12.88/mo — one click, no downtime.
+    </div>
+
+    <p>The VPS is self-managed, meaning I'll handle the full setup: installing PHP 8.3, Nginx, MySQL, Composer, Node.js, Supervisor (for background tasks), SSL, and firewall configuration. No ongoing management panel fees needed.</p>
+
+    <!-- ============================================================ -->
+    <h2>3. Email Delivery</h2>
+    <p>This handles all automated emails: candidate invitations, password resets, assessment results, and notifications. Two options depending on your preference.</p>
+
+    <h3>Option A: Resend <span class="badge badge-recommended">Recommended</span></h3>
+    <p>Modern email API — already integrated into the codebase. Best deliverability, emails land in inbox (not spam). No SMTP config needed.</p>
+    <table>
+        <tr><th>Plan</th><th>Emails/month</th><th>Daily Limit</th><th>Monthly</th></tr>
+        <tr><td>Free</td><td>3,000</td><td>100/day</td><td>$0</td></tr>
+        <tr><td>Pro (when needed)</td><td>50,000</td><td>Unlimited</td><td>$20/mo</td></tr>
+    </table>
+    <p>Start on Free. Move to Pro only when sending more than 100 invitations per day.</p>
+
+    <h3>Option B: Namecheap Private Email (SMTP) <span class="badge badge-alternative">Alternative</span></h3>
+    <p>Traditional email hosting. Gives you a proper mailbox (e.g., admin@quizly.com) that you can also use for sending/receiving regular email. Uses SMTP to send from the app.</p>
+    <table>
+        <tr><th>Plan</th><th>Mailboxes</th><th>Storage</th><th>Yearly</th></tr>
+        <tr><td>Starter</td><td>1</td><td>5 GB</td><td>$14.88/yr (~$1.24/mo)</td></tr>
+        <tr><td>Pro</td><td>3</td><td>10 GB each</td><td>$41.88/yr (~$3.49/mo)</td></tr>
+    </table>
+    <p>SMTP server: <code>smtp.privateemail.com</code> — Port 465 (SSL) or 587 (TLS).</p>
+
+    <div class="callout">
+        <strong>My recommendation:</strong> Use Resend for sending automated emails (better deliverability, faster) and Namecheap Private Email Starter ($14.88/yr) for receiving replies and having a professional inbox. Best of both worlds.
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>4. Proctoring Video Storage</h2>
+    <p>When webcam proctoring is enabled, candidate recordings are uploaded directly from their browser to Cloudinary. The app server doesn't handle the file transfer — keeps things fast and reliable.</p>
+
+    <table>
+        <tr><th>Plan</th><th>Allowance</th><th>Monthly</th></tr>
+        <tr><td>Free <span class="badge badge-free">FREE</span></td><td>25 credits (≈25 GB storage or bandwidth)</td><td>$0</td></tr>
+        <tr><td>Plus (if needed later)</td><td>225 credits</td><td>$89/mo</td></tr>
+    </table>
+
+    <p>Free tier handles roughly 250–500 proctoring sessions (at ~50 MB per recording). Only upgrade if proctoring is heavily used.</p>
+
+    <!-- ============================================================ -->
+    <h2>5. SSL & Security</h2>
+    <table>
+        <tr><th>Item</th><th>Provider</th><th>Cost</th></tr>
+        <tr><td>SSL Certificate (HTTPS)</td><td>Let's Encrypt</td><td>Free (auto-renewed every 90 days)</td></tr>
+        <tr><td>Firewall (UFW)</td><td>Built into server</td><td>Free</td></tr>
+        <tr><td>WebSocket server (Reverb)</td><td>Self-hosted on same VPS</td><td>Free</td></tr>
+    </table>
+
+    <!-- ============================================================ -->
+    <div class="page-break"></div>
+
+    <h2>Total Cost Summary</h2>
+
+    <div class="summary-card">
+        <h3>Monthly Running Cost</h3>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="label">Minimum (Free tiers)</div>
+                <div class="value">~$7/mo</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">With Pro email</div>
+                <div class="value">~$27/mo</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Detailed Breakdown</h3>
+    <table>
+        <tr><th>Service</th><th>Provider</th><th>Monthly</th></tr>
+        <tr><td>VPS Hosting (Pulsar)</td><td>Namecheap</td><td>$6.88</td></tr>
+        <tr><td>Email — Resend (Free tier)</td><td>Resend</td><td>$0</td></tr>
+        <tr><td>Video Storage (Cloudinary Free)</td><td>Cloudinary</td><td>$0</td></tr>
+        <tr><td>SSL (Let's Encrypt)</td><td>Let's Encrypt</td><td>$0</td></tr>
+        <tr><td>WebSocket Server (Reverb)</td><td>Self-hosted</td><td>$0</td></tr>
+        <tr class="total-row"><td colspan="2"><strong>Monthly Total</strong></td><td><strong>$6.88/mo</strong></td></tr>
+    </table>
+
+    <h3>One-Time Costs</h3>
+    <table>
+        <tr><th>Item</th><th>Cost</th></tr>
+        <tr><td>Domain (.com first year)</td><td>~$11</td></tr>
+        <tr><td>Namecheap Private Email Starter (optional, yearly)</td><td>$14.88</td></tr>
+        <tr><td>Server setup & deployment</td><td>Included</td></tr>
+    </table>
+
+    <h3>Annual Projection</h3>
+    <table>
+        <tr><th>Period</th><th>Breakdown</th><th>Total</th></tr>
+        <tr><td>Year 1</td><td>$11 (domain) + $14.88 (email) + ($6.88 × 12)</td><td><strong>~$108</strong></td></tr>
+        <tr><td>Year 2+</td><td>$18 (domain renewal) + $14.88 (email) + ($6.88 × 12)</td><td><strong>~$115/yr</strong></td></tr>
+    </table>
+
+    <div class="callout success">
+        <strong>Bottom line:</strong> The entire platform runs for about $7/month with free tiers, or about $27/month if you add Resend Pro for higher email volume. Even at full scale, annual costs stay well under $500.
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="page-break"></div>
+
+    <h2>Deployment Flow</h2>
+    <p>Here's the exact sequence from "ready to go" to "platform is live." Timeline: 2–3 working days.</p>
+
+    <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+            <h4>Domain & DNS Setup — Day 1</h4>
+            <ul>
+                <li>Purchase domain on Namecheap</li>
+                <li>Point DNS A record to VPS server IP</li>
+                <li>Configure email DNS records (SPF, DKIM, DMARC) for deliverability</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+            <h4>Server Provisioning — Day 1</h4>
+            <ul>
+                <li>Create Namecheap VPS (Ubuntu 24.04 LTS)</li>
+                <li>Install stack: PHP 8.3, Nginx, Composer, Node.js, MySQL 8, Supervisor</li>
+                <li>Set up firewall: only ports 80, 443, 22, 6001 open</li>
+                <li>Create deploy user with SSH key authentication</li>
+                <li>Harden server (disable root login, fail2ban)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+            <h4>Database Setup — Day 1</h4>
+            <ul>
+                <li>Install and configure MySQL 8 on the VPS</li>
+                <li>Create production database and restricted user</li>
+                <li>Run all migrations and seed initial data</li>
+                <li>Configure automated daily database backups</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+            <h4>Application Deployment — Day 1–2</h4>
+            <ul>
+                <li>Clone repository to server</li>
+                <li>Install production dependencies</li>
+                <li>Configure environment (database, email, Cloudinary, Reverb)</li>
+                <li>Build frontend assets</li>
+                <li>Set file permissions and ownership</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+            <h4>SSL & Web Server — Day 2</h4>
+            <ul>
+                <li>Install Certbot and issue Let's Encrypt SSL certificate</li>
+                <li>Configure Nginx with SSL, HTTP→HTTPS redirect, security headers</li>
+                <li>Set up auto-renewal cron for SSL certificate</li>
+                <li>Configure WebSocket proxy (wss:// via Nginx)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+            <h4>Background Services — Day 2</h4>
+            <ul>
+                <li>Configure Supervisor for queue workers (handles email sending, broadcasting)</li>
+                <li>Configure Supervisor for Reverb WebSocket server</li>
+                <li>Set up Laravel task scheduler via cron</li>
+                <li>Verify all services auto-start on reboot</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-content">
+            <h4>Testing & Go-Live — Day 2–3</h4>
+            <ul>
+                <li>Test full user flow: registration, login, create assessment</li>
+                <li>Test email delivery: invitations, results, password reset</li>
+                <li>Test proctoring: webcam recording and Cloudinary upload</li>
+                <li>Test real-time updates: WebSocket connectivity across pages</li>
+                <li>Monitor server logs for 24 hours</li>
+                <li>Share the live URL</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>What's Needed From You</h2>
+    <table>
+        <tr><th>#</th><th>Item</th><th>Notes</th></tr>
+        <tr><td>1</td><td>Domain name preference</td><td>I'll check availability on Namecheap</td></tr>
+        <tr><td>2</td><td>Namecheap account</td><td>For domain + VPS + email (everything in one place)</td></tr>
+        <tr><td>3</td><td>Resend account (optional)</td><td>Free at resend.com — only if using API email instead of SMTP</td></tr>
+        <tr><td>4</td><td>Payment method</td><td>Card on file for Namecheap (~$33 upfront, ~$7/mo ongoing)</td></tr>
+    </table>
+
+    <p style="margin-top: 24px; text-align: center; color: #94a3b8; font-size: 12px;">
+        Once you've got those sorted, I can have the platform live within 2–3 working days.
+    </p>
+
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px;">
+        Quizly Assessment Platform — Deployment Plan — March 2026
+    </div>
+</div>
+
+</body>
+</html>

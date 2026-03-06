@@ -26,6 +26,10 @@ class SendEmailJob implements ShouldQueue
 
     public function handle(): void
     {
+        if (!feature('email_notifications')) {
+            return;
+        }
+
         Mail::to($this->to)->send($this->mailable);
     }
 

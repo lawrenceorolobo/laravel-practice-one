@@ -32,6 +32,10 @@ class CandidateResultMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: new \Illuminate\Mail\Mailables\Address(
+                env('MAIL_NOTIFICATION_FROM', config('mail.from.address')),
+                env('MAIL_NOTIFICATION_NAME', config('mail.from.name'))
+            ),
             subject: "Your Assessment Result: {$this->assessment->title}",
         );
     }
