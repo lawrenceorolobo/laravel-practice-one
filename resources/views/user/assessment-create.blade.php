@@ -13,6 +13,28 @@
     </div>
 
     <form id="createForm" class="space-y-6">
+        <!-- Start from Template -->
+        <div class="glass rounded-2xl p-6" id="templateSection">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="font-bold text-lg">Start from Template</h3>
+                    <p class="text-slate-500 text-sm">Clone a pre-built assessment with questions ready to go</p>
+                </div>
+                <button type="button" onclick="document.getElementById('templateGrid').classList.toggle('hidden')" class="text-sm text-indigo-600 font-medium hover:text-indigo-700">
+                    Show/Hide
+                </button>
+            </div>
+            <div id="templateGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="col-span-full text-center text-slate-400 py-8">Loading templates...</div>
+            </div>
+        </div>
+
+        <div class="relative flex items-center gap-4 py-2">
+            <div class="flex-1 border-t border-slate-200"></div>
+            <span class="text-sm text-slate-400 font-medium">or create from scratch</span>
+            <div class="flex-1 border-t border-slate-200"></div>
+        </div>
+
         <!-- Basic Info -->
         <div class="glass rounded-2xl p-6">
             <h3 class="font-bold text-lg mb-4">Basic Information</h3>
@@ -217,5 +239,77 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
         btn.textContent = 'Create Assessment';
     }
 });
+
+// Load templates
+(async function loadTemplates() {
+    try {
+        const res = await fetch('/api/templates', {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+        });
+        const data = await res.json();
+        const grid = document.getElementById('templateGrid');
+
+        if (!data.templates || data.templates.length === 0) {
+            document.getElementById('templateSection').style.display = 'none';
+            return;
+        }
+
+        const typeLabels = {
+            single_choice: 'Choice', multiple_choice: 'Multi', true_false: 'T/F',
+            text_input: 'Text', fill_blank: 'Fill', numeric: 'Numeric',
+            ordering: 'Order', drag_drop_sort: 'Drag', matching: 'Match',
+            code_snippet: 'Code', likert_scale: 'Likert', sequence_pattern: 'Pattern',
+            matrix_pattern: 'Matrix', odd_one_out: 'Odd Out', spatial_rotation: 'Spatial',
+            shape_assembly: 'Shape', shape_puzzle: 'Puzzle', analogy: 'Analogy',
+            pattern_recognition: 'Pattern', mental_maths: 'Maths', word_problem: 'Word',
+            hotspot: 'Hotspot',
+        };
+
+        grid.innerHTML = data.templates.map(t => `
+            <div class="border-2 border-slate-200 rounded-xl p-4 hover:border-indigo-400 hover:shadow-lg transition-all cursor-pointer group"
+                 onclick="cloneTemplate('${t.id}', this)">
+                <h4 class="font-bold text-slate-800 mb-1 group-hover:text-indigo-600 transition">${t.title}</h4>
+                <p class="text-xs text-slate-400 mb-3 line-clamp-2">${t.description || ''}</p>
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">${t.questions_count} Q</span>
+                    <span class="text-xs text-slate-400">${t.duration_minutes} min</span>
+                    <span class="text-xs text-slate-400">${t.pass_percentage}% pass</span>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                    ${t.question_types.slice(0, 5).map(qt => `<span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">${typeLabels[qt] || qt}</span>`).join('')}
+                    ${t.question_types.length > 5 ? `<span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">+${t.question_types.length - 5}</span>` : ''}
+                </div>
+                <div class="mt-3 text-center">
+                    <span class="text-xs font-bold text-indigo-600 group-hover:text-indigo-700">Use Template →</span>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('templateSection').style.display = 'none';
+    }
+})();
+
+async function cloneTemplate(templateId, el) {
+    const origText = el.querySelector('span:last-child')?.textContent;
+    const label = el.querySelector('span:last-child');
+    if (label) label.textContent = 'Cloning...';
+
+    try {
+        const res = await fetch(`/api/templates/${templateId}/clone`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        });
+        const data = await res.json();
+        if (res.ok) {
+            window.location.href = `/assessments/${data.assessment.id}`;
+        } else {
+            toastError(data.message || 'Failed to clone template');
+            if (label) label.textContent = origText;
+        }
+    } catch (err) {
+        toastError('Network error');
+        if (label) label.textContent = origText;
+    }
+}
 </script>
 @endsection

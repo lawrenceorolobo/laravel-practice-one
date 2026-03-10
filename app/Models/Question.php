@@ -82,6 +82,7 @@ class Question extends Model
             'shape_assembly', 'analogy', 'pattern_recognition', 'mental_maths',
             'word_problem', 'drag_drop_sort', 'hotspot', 'code_snippet',
             'likert_scale', 'ordering', 'matching', 'fill_blank', 'numeric',
+            'shape_puzzle',
         ]);
     }
 }

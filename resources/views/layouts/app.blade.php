@@ -374,23 +374,8 @@
             toast.classList.add('translate-x-full', 'opacity-0');
         }
 
-        // Initialize Echo Listener
-        document.addEventListener('DOMContentLoaded', () => {
-            const userId = "{{ auth()->id() }}";
-            
-            if (userId && window.Echo) {
-                console.log('Listening for notifications on assessments.' + userId);
-                
-                window.Echo.private(`assessments.${userId}`)
-                    .listen('AssessmentCompleted', (e) => {
-                        console.log('Event received:', e);
-                        showToast(
-                            'Assessment Completed! 🎓', 
-                            `${e.candidate_name} has completed "${e.title}" with a score of ${e.score}%`
-                        );
-                    });
-            }
-        });
+        // Real-time notifications handled in user.blade.php and admin.blade.php layouts
+        // (app.blade.php is the public landing page — no WebSocket needed)
     </script>
 
     @yield('scripts')

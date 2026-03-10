@@ -2,48 +2,87 @@
 @section('title', 'Assessment Details | Quizly')
 
 @section('content')
+<style>
+.builder-block {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: grab;
+    user-select: none;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+@media (max-width: 639px) {
+    .builder-block { padding: 4px 8px; font-size: 10px; gap: 4px; }
+    .builder-block svg { width: 12px; height: 12px; }
+}
+.builder-block:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.builder-block:active {
+    cursor: grabbing;
+    transform: scale(0.95);
+    opacity: 0.7;
+}
+#questionsDropZone.drag-over {
+    outline: 2px solid rgb(99 102 241);
+    outline-offset: -2px;
+    background: rgba(99, 102, 241, 0.02);
+}
+</style>
+
 <div id="loading" class="text-center py-16">
     <div class="skeleton h-8 w-64 mx-auto mb-4"></div>
     <div class="skeleton h-4 w-48 mx-auto"></div>
 </div>
 
 <div id="content" class="hidden">
-    <div class="flex items-center justify-between mb-8">
+<div class="max-w-5xl mx-auto">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
             <a href="/assessments" class="text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-2 mb-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 Back
             </a>
-            <h2 class="text-2xl font-bold" id="title">Assessment</h2>
-            <p class="text-slate-500" id="description"></p>
+            <h2 class="text-xl sm:text-2xl font-bold" id="title">Assessment</h2>
+            <p class="text-slate-500 text-sm" id="description"></p>
         </div>
-        <div class="flex gap-3">
-            <button onclick="exportResultsCsv()" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm flex items-center gap-2" title="Export results as CSV">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="exportResultsCsv()" class="px-3 py-2 border rounded-lg hover:bg-slate-50 text-xs sm:text-sm flex items-center gap-1.5" title="Export results as CSV">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Export CSV
             </button>
-            <button onclick="editAssessment()" class="px-4 py-2 border rounded-lg hover:bg-slate-50">Edit</button>
-            <button onclick="publishAssessment()" id="publishBtn" class="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Publish</button>
+            <button onclick="editAssessment()" class="px-3 py-2 border rounded-lg hover:bg-slate-50 text-xs sm:text-sm">Edit</button>
+            <button onclick="duplicateAssessment()" class="px-3 py-2 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 flex items-center gap-1.5 text-xs sm:text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg>
+                Duplicate
+            </button>
+            <button onclick="publishAssessment()" id="publishBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs sm:text-sm">Publish</button>
         </div>
     </div>
 
     <!-- Stats -->
-    <div class="grid md:grid-cols-4 gap-4 mb-8">
-        <div class="glass rounded-xl p-4 text-center">
-            <p class="text-3xl font-bold text-indigo-600" id="questionsCount">0</p>
-            <p class="text-slate-500 text-sm">Questions</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        <div class="glass rounded-xl p-3 sm:p-4 text-center">
+            <p class="text-2xl sm:text-3xl font-bold text-indigo-600" id="questionsCount">0</p>
+            <p class="text-slate-500 text-xs sm:text-sm">Questions</p>
         </div>
-        <div class="glass rounded-xl p-4 text-center">
-            <p class="text-3xl font-bold text-emerald-600" id="candidatesCount">0</p>
-            <p class="text-slate-500 text-sm">Candidates</p>
+        <div class="glass rounded-xl p-3 sm:p-4 text-center">
+            <p class="text-2xl sm:text-3xl font-bold text-emerald-600" id="candidatesCount">0</p>
+            <p class="text-slate-500 text-xs sm:text-sm">Candidates</p>
         </div>
-        <div class="glass rounded-xl p-4 text-center">
-            <p class="text-3xl font-bold text-purple-600" id="completedCount">0</p>
-            <p class="text-slate-500 text-sm">Completed</p>
+        <div class="glass rounded-xl p-3 sm:p-4 text-center">
+            <p class="text-2xl sm:text-3xl font-bold text-purple-600" id="completedCount">0</p>
+            <p class="text-slate-500 text-xs sm:text-sm">Completed</p>
         </div>
-        <div class="glass rounded-xl p-4 text-center">
-            <p class="text-3xl font-bold text-amber-600" id="avgScore">-</p>
-            <p class="text-slate-500 text-sm">Avg Score</p>
+        <div class="glass rounded-xl p-3 sm:p-4 text-center">
+            <p class="text-2xl sm:text-3xl font-bold text-amber-600" id="avgScore">-</p>
+            <p class="text-slate-500 text-xs sm:text-sm">Avg Score</p>
         </div>
     </div>
 
@@ -61,20 +100,117 @@
         </div>
     </div>
 
+    <!-- Drag & Drop Question Builder -->
+    <div class="glass rounded-2xl p-4 sm:p-6 mb-6">
+        <div class="flex justify-between items-center mb-3">
+            <div>
+                <h3 class="font-bold text-base sm:text-lg">Question Builder</h3>
+                <p class="text-[10px] text-slate-400 hidden sm:block">Drag a type to add (desktop) or tap to add instantly (mobile)</p>
+            </div>
+            <button type="button" onclick="document.getElementById('builderPalette').classList.toggle('hidden')" class="text-sm text-indigo-600 font-medium hover:text-indigo-700">
+                Show/Hide
+            </button>
+        </div>
+        <div id="builderPalette" class="space-y-3">
+            <!-- Standard -->
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Standard</p>
+                <div class="flex flex-wrap gap-2">
+                    <div class="builder-block bg-blue-50 border border-blue-200 text-blue-700" draggable="true" data-qtype="single_choice">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                        Single Choice
+                    </div>
+                    <div class="builder-block bg-blue-50 border border-blue-200 text-blue-700" draggable="true" data-qtype="multiple_choice">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke-width="2" stroke-linecap="round"/></svg>
+                        Multiple Choice
+                    </div>
+                    <div class="builder-block bg-blue-50 border border-blue-200 text-blue-700" draggable="true" data-qtype="true_false">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" stroke-width="2" stroke-linecap="round"/></svg>
+                        True / False
+                    </div>
+                    <div class="builder-block bg-blue-50 border border-blue-200 text-blue-700" draggable="true" data-qtype="text_input">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h14" stroke-width="2" stroke-linecap="round"/></svg>
+                        Text Input
+                    </div>
+                    <div class="builder-block bg-blue-50 border border-blue-200 text-blue-700" draggable="true" data-qtype="fill_blank">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 17h6m4 0h6M4 7h16M4 12h16" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3"/></svg>
+                        Fill Blank
+                    </div>
+                    <div class="builder-block bg-blue-50 border border-blue-200 text-blue-700" draggable="true" data-qtype="numeric">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 20V4m5 16V4m5 16V4" stroke-width="2" stroke-linecap="round"/></svg>
+                        Numeric
+                    </div>
+                </div>
+            </div>
+            <!-- Sorting & Matching -->
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Sorting & Matching</p>
+                <div class="flex flex-wrap gap-2">
+                    <div class="builder-block bg-amber-50 border border-amber-200 text-amber-700" draggable="true" data-qtype="ordering">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 7h4m-4 5h4m-4 5h4m6-10h8m-8 5h8m-8 5h8" stroke-width="2" stroke-linecap="round"/></svg>
+                        Ordering
+                    </div>
+                    <div class="builder-block bg-amber-50 border border-amber-200 text-amber-700" draggable="true" data-qtype="drag_drop_sort">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke-width="2" stroke-linecap="round"/></svg>
+                        Drag & Drop Sort
+                    </div>
+                    <div class="builder-block bg-amber-50 border border-amber-200 text-amber-700" draggable="true" data-qtype="matching">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h4m8 0h4M4 12h4m8 0h4M4 18h4m8 0h4M8 6l8 12M8 12h8M8 18l8-12" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Matching Pairs
+                    </div>
+                </div>
+            </div>
+            <!-- Psychometric / Reasoning -->
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Psychometric / Reasoning</p>
+                <div class="flex flex-wrap gap-2">
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="sequence_pattern">🔢 Sequence</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="matrix_pattern">🔲 Matrix</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="odd_one_out">🎯 Odd One Out</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="spatial_rotation">🔄 Spatial</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="shape_assembly">🧩 Shape Assembly</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="shape_puzzle">🧱 Shape Puzzle</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="analogy">🔗 Analogy</div>
+                    <div class="builder-block bg-purple-50 border border-purple-200 text-purple-700" draggable="true" data-qtype="pattern_recognition">👁️ Pattern</div>
+                </div>
+            </div>
+            <!-- Interactive -->
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Interactive</p>
+                <div class="flex flex-wrap gap-2">
+                    <div class="builder-block bg-emerald-50 border border-emerald-200 text-emerald-700" draggable="true" data-qtype="hotspot">📍 Hotspot</div>
+                    <div class="builder-block bg-emerald-50 border border-emerald-200 text-emerald-700" draggable="true" data-qtype="code_snippet">💻 Code</div>
+                    <div class="builder-block bg-emerald-50 border border-emerald-200 text-emerald-700" draggable="true" data-qtype="likert_scale">📊 Likert Scale</div>
+                    <div class="builder-block bg-emerald-50 border border-emerald-200 text-emerald-700" draggable="true" data-qtype="word_problem">📝 Word Problem</div>
+                    <div class="builder-block bg-emerald-50 border border-emerald-200 text-emerald-700" draggable="true" data-qtype="mental_maths">🧮 Mental Maths</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Questions -->
-    <div class="glass rounded-2xl p-6 mb-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold text-lg">Questions</h3>
-            <div class="flex gap-2">
-                <button onclick="openQuestionImportModal()" class="px-4 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 flex items-center gap-2 text-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"/></svg>
-                    Import CSV
+    <div class="glass rounded-2xl p-4 sm:p-6 mb-6" id="questionsDropZone">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+            <h3 class="font-bold text-base sm:text-lg">Questions</h3>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="openQuestionBank()" class="px-3 py-1.5 sm:px-4 sm:py-2 border border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 flex items-center gap-1.5 text-xs sm:text-sm">
+                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <span class="hidden xs:inline">Question</span> Bank
                 </button>
-                <button onclick="openQuestionModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <button onclick="openQuestionImportModal()" class="px-3 py-1.5 sm:px-4 sm:py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 flex items-center gap-1.5 text-xs sm:text-sm">
+                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12"/></svg>
+                    <span class="hidden xs:inline">Import</span> CSV
+                </button>
+                <button onclick="openQuestionModal()" class="px-3 py-1.5 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 text-xs sm:text-sm">
+                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Add Question
                 </button>
             </div>
+        </div>
+        <!-- Drop zone hint (shown during drag) -->
+        <div id="dropHint" class="hidden border-2 border-dashed border-indigo-300 rounded-xl p-6 text-center text-indigo-400 mb-4 bg-indigo-50/50 transition-all">
+            <svg class="w-8 h-8 mx-auto mb-2 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+            Drop here to add question
         </div>
         <div id="questionsList"></div>
     </div>
@@ -125,6 +261,7 @@
                         <option value="odd_one_out">Odd One Out</option>
                         <option value="spatial_rotation">Spatial Rotation</option>
                         <option value="shape_assembly">Shape Assembly</option>
+                        <option value="shape_puzzle">Shape Puzzle (Fit the Pieces)</option>
                         <option value="analogy">Analogy</option>
                         <option value="pattern_recognition">Pattern Recognition</option>
                     </optgroup>
@@ -360,10 +497,186 @@
         </div>
     </div>
 </div>
+</div>
+
+<!-- Question Bank Modal -->
+<div id="questionBankModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl h-[85vh] sm:h-auto sm:max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b">
+            <div>
+                <h3 class="text-base sm:text-xl font-bold">Question Bank</h3>
+                <p class="text-[10px] sm:text-xs text-slate-400">Pick questions from templates</p>
+            </div>
+            <button onclick="closeQuestionBank()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+        <div class="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
+            <!-- Template list -->
+            <div class="sm:w-56 md:w-64 border-b sm:border-b-0 sm:border-r overflow-y-auto bg-slate-50 shrink-0 max-h-[30vh] sm:max-h-none" id="qbTemplateList">
+                <p class="text-center text-slate-400 py-4 text-sm">Loading...</p>
+            </div>
+            <!-- Questions area -->
+            <div class="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0" id="qbQuestionsArea">
+                <p class="text-center text-slate-400 py-8 text-sm">← Select a template</p>
+            </div>
+        </div>
+        <div class="flex items-center justify-between p-3 sm:p-4 border-t bg-slate-50 rounded-b-2xl">
+            <span id="qbSelectedCount" class="text-xs text-slate-500">0 selected</span>
+            <div class="flex gap-2">
+                <button onclick="closeQuestionBank()" class="px-3 py-2 border rounded-lg text-xs sm:text-sm">Cancel</button>
+                <button onclick="importSelectedQuestions()" id="qbImportBtn" disabled class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                    Import Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
 <script>
+// Builder palette drag-to-create engine (desktop + mobile touch)
+(function() {
+    let draggedType = null;
+
+    // Attach drag events to all builder blocks
+    document.querySelectorAll('.builder-block').forEach(block => {
+        // Desktop drag
+        block.addEventListener('dragstart', (e) => {
+            draggedType = block.dataset.qtype;
+            e.dataTransfer.setData('text/plain', draggedType);
+            e.dataTransfer.effectAllowed = 'copy';
+            setTimeout(() => document.getElementById('dropHint').classList.remove('hidden'), 0);
+        });
+
+        block.addEventListener('dragend', () => {
+            draggedType = null;
+            document.getElementById('dropHint').classList.add('hidden');
+            document.getElementById('questionsDropZone').classList.remove('drag-over');
+        });
+
+        // Click/Tap to add instantly (works on both desktop and mobile)
+        block.addEventListener('click', (e) => {
+            if (block._wasDragging) { block._wasDragging = false; return; }
+            openQuestionModal();
+            setTimeout(() => {
+                document.querySelector('[name="type"]').value = block.dataset.qtype;
+                onTypeChange(block.dataset.qtype);
+            }, 50);
+        });
+
+        // Mobile touch drag support
+        let touchClone = null;
+        let touchStartX, touchStartY, longPressTimer;
+
+        block.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            block._wasDragging = false;
+
+            longPressTimer = setTimeout(() => {
+                block._wasDragging = true;
+                draggedType = block.dataset.qtype;
+                document.getElementById('dropHint').classList.remove('hidden');
+
+                // Create floating clone
+                touchClone = block.cloneNode(true);
+                touchClone.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;opacity:0.85;transform:scale(1.1);box-shadow:0 8px 30px rgba(0,0,0,0.2);';
+                touchClone.style.left = (touchStartX - 50) + 'px';
+                touchClone.style.top = (touchStartY - 20) + 'px';
+                document.body.appendChild(touchClone);
+                navigator.vibrate?.(30);
+            }, 400);
+        }, { passive: true });
+
+        block.addEventListener('touchmove', (e) => {
+            const t = e.touches[0];
+            const dx = Math.abs(t.clientX - touchStartX);
+            const dy = Math.abs(t.clientY - touchStartY);
+
+            if (!block._wasDragging && (dx > 10 || dy > 10)) {
+                clearTimeout(longPressTimer);
+            }
+
+            if (touchClone) {
+                touchClone.style.left = (t.clientX - 50) + 'px';
+                touchClone.style.top = (t.clientY - 20) + 'px';
+
+                // Check if over drop zone
+                const dropZone = document.getElementById('questionsDropZone');
+                const rect = dropZone.getBoundingClientRect();
+                if (t.clientX >= rect.left && t.clientX <= rect.right && t.clientY >= rect.top && t.clientY <= rect.bottom) {
+                    dropZone.classList.add('drag-over');
+                } else {
+                    dropZone.classList.remove('drag-over');
+                }
+            }
+        }, { passive: true });
+
+        block.addEventListener('touchend', (e) => {
+            clearTimeout(longPressTimer);
+
+            if (touchClone) {
+                const t = e.changedTouches[0];
+                const dropZone = document.getElementById('questionsDropZone');
+                const rect = dropZone.getBoundingClientRect();
+
+                touchClone.remove();
+                touchClone = null;
+                dropZone.classList.remove('drag-over');
+                document.getElementById('dropHint').classList.add('hidden');
+
+                if (t.clientX >= rect.left && t.clientX <= rect.right && t.clientY >= rect.top && t.clientY <= rect.bottom) {
+                    openQuestionModal();
+                    setTimeout(() => {
+                        document.querySelector('[name="type"]').value = draggedType;
+                        onTypeChange(draggedType);
+                    }, 50);
+                }
+                draggedType = null;
+            }
+        });
+
+        block.addEventListener('touchcancel', () => {
+            clearTimeout(longPressTimer);
+            if (touchClone) { touchClone.remove(); touchClone = null; }
+            document.getElementById('dropHint')?.classList.add('hidden');
+            document.getElementById('questionsDropZone')?.classList.remove('drag-over');
+            draggedType = null;
+        });
+    });
+
+    // Desktop drop zone events
+    const dropZone = document.getElementById('questionsDropZone');
+
+    dropZone.addEventListener('dragover', (e) => {
+        if (!draggedType) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        if (!dropZone.contains(e.relatedTarget)) {
+            dropZone.classList.remove('drag-over');
+        }
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const type = e.dataTransfer.getData('text/plain');
+        dropZone.classList.remove('drag-over');
+        document.getElementById('dropHint').classList.add('hidden');
+        if (type) {
+            openQuestionModal();
+            setTimeout(() => {
+                document.querySelector('[name="type"]').value = type;
+                onTypeChange(type);
+            }, 50);
+        }
+    });
+})();
+
 const assessmentId = window.location.pathname.split('/')[2];
 let assessment = null;
 
@@ -419,6 +732,25 @@ function renderAssessment() {
         .listen('TestCompleted', () => { loadInvitees(); loadAssessment(); });
 }
 
+async function duplicateAssessment() {
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/duplicate`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toastSuccess(data.message);
+            // Redirect to the new assessment
+            setTimeout(() => { window.location.href = '/assessments/' + data.assessment.id; }, 1000);
+        } else {
+            toastError(data.message || 'Failed to duplicate');
+        }
+    } catch (err) {
+        toastError('Network error');
+    }
+}
+
 let selectedQuestions = new Set();
 
 function renderQuestions() {
@@ -436,8 +768,10 @@ function renderQuestions() {
             <span id="selectedQCount" class="ml-auto text-xs text-slate-400"></span>
         </div>`;
     const rows = assessment.questions.map((q, i) => `
-        <div class="flex items-center justify-between p-4 border-b last:border-0">
+        <div class="flex items-center justify-between p-4 border-b last:border-0 q-row" draggable="true" data-idx="${i}" data-id="${q.id}"
+             ondragstart="qDragStart(event, ${i})" ondragover="qDragOver(event)" ondrop="qDrop(event, ${i})" ondragend="qDragEnd(event)">
             <div class="flex items-center gap-3 flex-1 min-w-0">
+                <span class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 select-none" style="font-size:18px" title="Drag to reorder">⠿</span>
                 <input type="checkbox" class="q-cb w-4 h-4 accent-indigo-600" data-id="${q.id}" onchange="onQuestionCheck()">
                 <span class="font-bold text-indigo-600 shrink-0">Q${i + 1}.</span>
                 <span class="truncate">${q.question_text}</span>
@@ -456,6 +790,90 @@ function renderQuestions() {
     `).join('');
     list.innerHTML = header + rows;
 }
+
+// ─── Question Drag-Drop Reorder ───
+let qDragIdx = null;
+
+function qDragStart(e, idx) {
+    qDragIdx = idx;
+    e.currentTarget.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function qDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const row = e.target.closest('.q-row');
+    document.querySelectorAll('.q-row').forEach(r => r.style.borderTopColor = '');
+    if (row && parseInt(row.dataset.idx) !== qDragIdx) {
+        row.style.borderTopColor = '#6366f1';
+        row.style.borderTopWidth = '3px';
+    }
+}
+
+function qDragEnd(e) {
+    e.currentTarget.style.opacity = '1';
+    document.querySelectorAll('.q-row').forEach(r => { r.style.borderTopColor = ''; r.style.borderTopWidth = ''; });
+    qDragIdx = null;
+}
+
+async function qDrop(e, targetIdx) {
+    e.preventDefault();
+    document.querySelectorAll('.q-row').forEach(r => { r.style.borderTopColor = ''; r.style.borderTopWidth = ''; });
+    if (qDragIdx === null || qDragIdx === targetIdx) return;
+
+    // Reorder locally
+    const moved = assessment.questions.splice(qDragIdx, 1)[0];
+    assessment.questions.splice(targetIdx, 0, moved);
+    renderQuestions();
+
+    // Save order to API
+    const order = assessment.questions.map(q => q.id);
+    try {
+        await fetch(`/api/assessments/${assessmentId}/questions/reorder`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ questions: order }),
+        });
+        toastSuccess('Questions reordered');
+    } catch (err) {
+        toastError('Failed to save order');
+    }
+    qDragIdx = null;
+}
+
+// ─── Touch reorder for mobile ───
+(function() {
+    let tIdx = null, tClone = null;
+    document.addEventListener('touchstart', function(e) {
+        const grip = e.target.closest('.q-row [title="Drag to reorder"]');
+        if (!grip) return;
+        const row = grip.closest('.q-row');
+        tIdx = parseInt(row.dataset.idx);
+        tClone = row.cloneNode(true);
+        tClone.style.cssText = 'position:fixed;pointer-events:none;opacity:0.85;z-index:9999;width:'+row.offsetWidth+'px;box-shadow:0 4px 20px rgba(0,0,0,0.15);background:#fff;border-radius:8px;';
+        document.body.appendChild(tClone);
+        row.style.opacity = '0.3';
+    }, { passive: true });
+    document.addEventListener('touchmove', function(e) {
+        if (tIdx === null || !tClone) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        tClone.style.left = '16px'; tClone.style.top = (t.clientY - 25) + 'px';
+    }, { passive: false });
+    document.addEventListener('touchend', function(e) {
+        if (tIdx === null) return;
+        if (tClone) { tClone.remove(); tClone = null; }
+        document.querySelectorAll('.q-row').forEach(r => r.style.opacity = '1');
+        const t = e.changedTouches[0];
+        const target = document.elementFromPoint(t.clientX, t.clientY)?.closest('.q-row');
+        if (target) {
+            const targetIdx = parseInt(target.dataset.idx);
+            if (targetIdx !== tIdx) qDrop(e, targetIdx);
+        }
+        tIdx = null;
+    }, { passive: true });
+})();
 
 function onQuestionCheck() {
     selectedQuestions.clear();
@@ -682,7 +1100,7 @@ const CHOICE_TYPES = ['single_choice', 'multiple_choice', 'true_false', 'odd_one
 const TEXT_TYPES = ['text_input', 'fill_blank', 'code_snippet', 'word_problem', 'mental_maths'];
 const ORDERING_TYPES = ['ordering', 'drag_drop_sort'];
 const PATTERN_TYPES = ['sequence_pattern', 'matrix_pattern', 'spatial_rotation', 'shape_assembly',
-    'pattern_recognition', 'hotspot', 'analogy'];
+    'pattern_recognition', 'hotspot', 'analogy', 'shape_puzzle'];
 
 function onTypeChange(type) {
     currentType = type;
@@ -710,8 +1128,17 @@ function onTypeChange(type) {
         document.getElementById('textAnswerContainer').classList.remove('hidden');
     } else if (type === 'numeric') {
         document.getElementById('numericContainer').classList.remove('hidden');
-    } else if (ORDERING_TYPES.includes(type)) {
+    } else if (ORDERING_TYPES.includes(type) || type === 'shape_puzzle') {
         document.getElementById('orderingContainer').classList.remove('hidden');
+        const label = document.querySelector('#orderingContainer > label');
+        const hint = document.querySelector('#orderingContainer > p');
+        if (type === 'shape_puzzle') {
+            label.textContent = 'Puzzle Pieces (in correct slot order)';
+            hint.textContent = 'Add the shape/piece names in the correct slot order. They will be shuffled for the candidate to drag and fit.';
+        } else {
+            label.textContent = 'Items (in CORRECT order)';
+            hint.textContent = "Add items top-to-bottom in the correct sequence. They'll be shuffled during the test.";
+        }
         document.getElementById('orderingList').innerHTML = '';
         orderingCount = 0;
         for (let i = 0; i < 3; i++) addOrderingItem();
@@ -794,7 +1221,7 @@ function editQuestion(q) {
     } else if (q.question_type === 'numeric') {
         document.querySelector('[name="numeric_answer"]').value = q.expected_answer || '';
         document.querySelector('[name="numeric_tolerance"]').value = meta.tolerance || 0;
-    } else if (ORDERING_TYPES.includes(q.question_type) && q.options) {
+    } else if ((ORDERING_TYPES.includes(q.question_type) || q.question_type === 'shape_puzzle') && q.options) {
         document.getElementById('orderingList').innerHTML = '';
         orderingCount = 0;
         q.options.forEach(opt => addOrderingItem(opt.option_text || opt.text || ''));
@@ -1025,14 +1452,14 @@ document.getElementById('questionForm').addEventListener('submit', async (e) => 
         body.expected_answer = numAnswer;
         body.options = [];
         metadata.tolerance = parseFloat(form.numeric_tolerance.value) || 0;
-    } else if (ORDERING_TYPES.includes(type)) {
+    } else if (ORDERING_TYPES.includes(type) || type === 'shape_puzzle') {
         const items = [];
         for (let i = 0; i < orderingCount; i++) {
             const val = form[`ordering_${i}`]?.value?.trim();
             if (val) items.push(val);
         }
         if (items.length < 2) {
-            errEl.textContent = 'Please add at least 2 ordering items.';
+            errEl.textContent = type === 'shape_puzzle' ? 'Please add at least 2 puzzle pieces.' : 'Please add at least 2 ordering items.';
             errEl.classList.remove('hidden');
             return;
         }
@@ -1496,8 +1923,19 @@ async function viewAnswers(sessionId) {
                     <span class="text-slate-500">${data.correct_count}/${data.total_questions} correct</span>
                     ${s.time_spent ? `<span class="text-slate-500">${Math.round(s.time_spent / 60)} min</span>` : ''}
                     ${s.tab_switches > 0 ? `<span class="text-amber-600" title="Tab switches">⚠ ${s.tab_switches} tab switch${s.tab_switches > 1 ? 'es' : ''}</span>` : ''}
+                    ${s.webcam_recording_url ? `<button onclick="document.getElementById('proctoringVideo').classList.toggle('hidden')" class="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition font-medium">📹 View Recording</button>` : ''}
                 </div>
-            </div>`;
+            </div>
+            ${s.webcam_recording_url ? `
+            <div id="proctoringVideo" class="hidden mt-4 rounded-xl overflow-hidden border border-slate-200">
+                <div class="bg-slate-50 px-4 py-2 border-b flex items-center justify-between">
+                    <span class="text-sm font-medium text-slate-600">📹 Proctoring Recording</span>
+                    <button onclick="document.getElementById('proctoringVideo').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <video controls class="w-full max-h-96" src="${s.webcam_recording_url}"></video>
+            </div>` : ''}`;
 
         const questions = data.answers.map((a, i) => {
             const optionsHtml = a.options.length > 0 ? a.options.map(o => {
@@ -1573,6 +2011,179 @@ async function exportResultsCsv() {
 }
 
 loadAssessment();
+// ═══════════════════════════════════════════════
+// Question Bank
+// ═══════════════════════════════════════════════
+let qbSelectedIds = new Set();
+let qbTemplatesCache = null;
+
+function openQuestionBank() {
+    document.getElementById('questionBankModal').classList.remove('hidden');
+    qbSelectedIds.clear();
+    updateQbCount();
+    loadQbTemplates();
+}
+
+function closeQuestionBank() {
+    document.getElementById('questionBankModal').classList.add('hidden');
+}
+
+async function loadQbTemplates() {
+    const list = document.getElementById('qbTemplateList');
+    if (qbTemplatesCache) {
+        renderQbTemplates(qbTemplatesCache);
+        return;
+    }
+    list.innerHTML = '<p class="text-center text-slate-400 py-4 text-sm">Loading...</p>';
+    try {
+        const res = await fetch('/api/templates', {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+        });
+        const data = await res.json();
+        qbTemplatesCache = data.templates || [];
+        renderQbTemplates(qbTemplatesCache);
+    } catch (e) {
+        list.innerHTML = '<p class="text-center text-red-400 py-4 text-sm">Failed to load</p>';
+    }
+}
+
+function renderQbTemplates(templates) {
+    const list = document.getElementById('qbTemplateList');
+    if (!templates.length) {
+        list.innerHTML = '<p class="text-center text-slate-400 py-4 text-sm">No templates found</p>';
+        return;
+    }
+    list.innerHTML = templates.map(t => `
+        <button onclick="loadQbQuestions('${t.id}', this)" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition text-sm qb-tmpl-btn">
+            <div class="font-semibold text-slate-700 truncate text-xs sm:text-sm">${t.title}</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">${t.questions_count} questions</div>
+        </button>
+    `).join('');
+}
+
+async function loadQbQuestions(templateId, btnEl) {
+    // Highlight active template
+    document.querySelectorAll('.qb-tmpl-btn').forEach(b => b.classList.remove('bg-white', 'shadow-sm', 'ring-2', 'ring-indigo-300'));
+    if (btnEl) btnEl.classList.add('bg-white', 'shadow-sm', 'ring-2', 'ring-indigo-300');
+
+    const area = document.getElementById('qbQuestionsArea');
+    area.innerHTML = '<p class="text-center text-slate-400 py-8">Loading questions...</p>';
+
+    try {
+        const res = await fetch(`/api/templates/${templateId}/questions`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+        });
+        const data = await res.json();
+        const questions = data.questions || [];
+
+        if (!questions.length) {
+            area.innerHTML = '<p class="text-center text-slate-400 py-8">No questions in this template</p>';
+            return;
+        }
+
+        const typeBadge = (type) => {
+            const colors = {
+                single_choice: 'bg-blue-100 text-blue-700', multiple_choice: 'bg-blue-100 text-blue-700',
+                true_false: 'bg-blue-100 text-blue-700', text_input: 'bg-blue-100 text-blue-700',
+                fill_blank: 'bg-blue-100 text-blue-700', numeric: 'bg-blue-100 text-blue-700',
+                ordering: 'bg-amber-100 text-amber-700', drag_drop_sort: 'bg-amber-100 text-amber-700',
+                matching: 'bg-amber-100 text-amber-700',
+                code_snippet: 'bg-emerald-100 text-emerald-700', likert_scale: 'bg-emerald-100 text-emerald-700',
+                hotspot: 'bg-emerald-100 text-emerald-700', word_problem: 'bg-emerald-100 text-emerald-700',
+                mental_maths: 'bg-emerald-100 text-emerald-700',
+            };
+            const c = colors[type] || 'bg-purple-100 text-purple-700';
+            return `<span class="text-[10px] px-1.5 py-0.5 rounded ${c}">${type.replace(/_/g, ' ')}</span>`;
+        };
+
+        area.innerHTML = `
+            <div class="flex items-center justify-between mb-3">
+                <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-600">
+                    <input type="checkbox" onchange="toggleQbAll(this, '${templateId}')" class="w-4 h-4 rounded">
+                    Select All
+                </label>
+                <span class="text-xs text-slate-400">${data.template?.title || ''}</span>
+            </div>
+            <div class="space-y-2">
+                ${questions.map((q, i) => `
+                    <label class="flex items-start gap-3 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer transition ${qbSelectedIds.has(q.id) ? 'bg-indigo-50 border-indigo-300' : ''}">
+                        <input type="checkbox" value="${q.id}" onchange="toggleQbQuestion(this)" ${qbSelectedIds.has(q.id) ? 'checked' : ''} class="w-4 h-4 rounded mt-0.5 shrink-0">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs font-bold text-slate-400">Q${i + 1}</span>
+                                ${typeBadge(q.question_type)}
+                                <span class="text-[10px] text-slate-400">${q.points} pts</span>
+                            </div>
+                            <p class="text-sm text-slate-700 line-clamp-2">${q.question_text}</p>
+                        </div>
+                    </label>
+                `).join('')}
+            </div>
+        `;
+    } catch (e) {
+        area.innerHTML = '<p class="text-center text-red-400 py-8">Failed to load questions</p>';
+    }
+}
+
+function toggleQbQuestion(cb) {
+    if (cb.checked) {
+        qbSelectedIds.add(cb.value);
+        cb.closest('label').classList.add('bg-indigo-50', 'border-indigo-300');
+    } else {
+        qbSelectedIds.delete(cb.value);
+        cb.closest('label').classList.remove('bg-indigo-50', 'border-indigo-300');
+    }
+    updateQbCount();
+}
+
+function toggleQbAll(cb) {
+    const checkboxes = document.querySelectorAll('#qbQuestionsArea input[type="checkbox"][value]');
+    checkboxes.forEach(c => {
+        c.checked = cb.checked;
+        if (cb.checked) {
+            qbSelectedIds.add(c.value);
+            c.closest('label')?.classList.add('bg-indigo-50', 'border-indigo-300');
+        } else {
+            qbSelectedIds.delete(c.value);
+            c.closest('label')?.classList.remove('bg-indigo-50', 'border-indigo-300');
+        }
+    });
+    updateQbCount();
+}
+
+function updateQbCount() {
+    const count = qbSelectedIds.size;
+    document.getElementById('qbSelectedCount').textContent = `${count} question${count !== 1 ? 's' : ''} selected`;
+    document.getElementById('qbImportBtn').disabled = count === 0;
+}
+
+async function importSelectedQuestions() {
+    if (qbSelectedIds.size === 0) return;
+    const btn = document.getElementById('qbImportBtn');
+    btn.disabled = true;
+    btn.textContent = 'Importing...';
+
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/import-questions`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ question_ids: Array.from(qbSelectedIds) }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toastSuccess(data.message);
+            closeQuestionBank();
+            loadAssessment();
+        } else {
+            toastError(data.message || 'Import failed');
+        }
+    } catch (e) {
+        toastError('Network error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Import Selected';
+    }
+}
 </script>
 
 <!-- Answers Modal -->

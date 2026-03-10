@@ -234,7 +234,7 @@ async function loadAnalytics() {
 
         if (assessmentsRes.ok) {
             const json = await assessmentsRes.json();
-            assessmentsData = json.data || [];
+            assessmentsData = (json.data || []).filter(a => !a.is_template);
             renderAssessmentTable(assessmentsData);
         }
     } catch (err) { console.error('Analytics error:', err); }
@@ -498,14 +498,19 @@ async function exportPdf() {
         parent.replaceChild(imgEl, svg);
     }
 
-    await html2pdf().set({
-        margin: [8, 8, 8, 8],
-        filename: `quizly-analytics-${new Date().toISOString().slice(0,10)}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 1.5, useCORS: true, scrollY: -window.scrollY, windowWidth: el.scrollWidth },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['avoid-all', 'css'] },
-    }).from(el).save();
+    try {
+        await html2pdf().set({
+            margin: [8, 8, 8, 8],
+            filename: `quizly-analytics-${new Date().toISOString().slice(0,10)}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 1.5, useCORS: true, scrollY: -window.scrollY, windowWidth: el.scrollWidth },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+            pagebreak: { mode: ['avoid-all', 'css'] },
+        }).from(el).save();
+    } catch (err) {
+        console.error('PDF export failed:', err);
+        toastError('PDF export failed. Please try again.');
+    }
 
     // Restore SVGs
     originals.forEach(({ parent, svg, imgEl }) => parent.replaceChild(svg, imgEl));

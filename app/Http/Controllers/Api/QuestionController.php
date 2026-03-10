@@ -20,8 +20,9 @@ class QuestionController extends Controller
     {
         $assessment = $this->getEditableAssessment($request, $assessmentId);
 
-        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem';
+        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem,shape_puzzle';
         $noOptionTypes = ['text_input', 'fill_blank', 'numeric', 'mental_maths', 'word_problem', 'code_snippet'];
+        $skipCorrectValidation = ['ordering', 'drag_drop_sort', 'matching', 'likert_scale', 'shape_puzzle'];
 
         $validated = $request->validate([
             'question_text' => ['required', 'string', 'max:2000'],
@@ -29,15 +30,16 @@ class QuestionController extends Controller
             'question_metadata' => ['nullable', 'array'],
             'points' => ['integer', 'min:1', 'max:100'],
             'expected_answer' => ['nullable', 'string', 'max:1000'],
-            'options' => [in_array($request->question_type, $noOptionTypes) ? 'nullable' : 'required', 'array', 'min:2', 'max:10'],
+            'options' => [in_array($request->question_type, $noOptionTypes) ? 'nullable' : 'sometimes', 'array', 'max:20'],
             'options.*.text' => ['required', 'string', 'max:500'],
             'options.*.is_correct' => ['required', 'boolean'],
             'options.*.media_url' => ['nullable', 'string', 'max:500'],
             'options.*.media_type' => ['nullable', 'string', 'max:50'],
         ]);
 
-        // Validate at least one correct option for choice types
-        if (!in_array($validated['question_type'], $noOptionTypes) && !empty($validated['options'])) {
+        // Validate at least one correct option for standard choice types
+        $qType = $validated['question_type'];
+        if (!in_array($qType, $noOptionTypes) && !in_array($qType, $skipCorrectValidation) && !empty($validated['options'])) {
             $correctCount = collect($validated['options'])->where('is_correct', true)->count();
             
             if ($correctCount === 0) {
@@ -46,14 +48,14 @@ class QuestionController extends Controller
                 ]);
             }
 
-            if ($validated['question_type'] === 'single_choice' && $correctCount > 1) {
+            if ($qType === 'single_choice' && $correctCount > 1) {
                 throw ValidationException::withMessages([
                     'options' => ['Single choice questions can only have one correct answer.'],
                 ]);
             }
         }
 
-        return DB::transaction(function () use ($assessment, $validated) {
+        return DB::transaction(function () use ($assessment, $validated, $noOptionTypes) {
             // Check for duplicate question text
             $exists = $assessment->questions()
                 ->whereRaw('LOWER(question_text) = ?', [strtolower($validated['question_text'])])
@@ -76,7 +78,8 @@ class QuestionController extends Controller
                 'question_order' => $maxOrder + 1,
             ]);
 
-            if (!in_array($validated['question_type'], $noOptionTypes) && !empty($validated['options'])) {
+            // Save options for any type that has them
+            if (!empty($validated['options'])) {
                 $optionRows = [];
                 foreach ($validated['options'] as $index => $option) {
                     $optionRows[] = [
@@ -115,7 +118,7 @@ class QuestionController extends Controller
             ->where('assessment_id', $assessment->id)
             ->firstOrFail();
 
-        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem';
+        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem,shape_puzzle';
 
         $validated = $request->validate([
             'question_text' => ['sometimes', 'string', 'max:2000'],
@@ -134,6 +137,7 @@ class QuestionController extends Controller
             $question->update([
                 'question_text' => $validated['question_text'] ?? $question->question_text,
                 'question_type' => $validated['question_type'] ?? $question->question_type,
+                'question_metadata' => array_key_exists('question_metadata', $validated) ? $validated['question_metadata'] : $question->question_metadata,
                 'points' => $validated['points'] ?? $question->points,
                 'expected_answer' => $validated['expected_answer'] ?? $question->expected_answer,
             ]);

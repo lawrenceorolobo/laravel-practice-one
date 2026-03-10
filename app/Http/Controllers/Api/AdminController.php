@@ -74,6 +74,11 @@ class AdminController extends Controller
             'is_active' => !$user->is_active,
         ]);
 
+        // Revoke all tokens when deactivating (instant logout)
+        if (!$user->is_active) {
+            $user->tokens()->delete();
+        }
+
         logger()->info('Admin toggled user status', [
             'admin_id' => $request->user()->id,
             'user_id' => $id,
@@ -81,7 +86,7 @@ class AdminController extends Controller
         ]);
 
         return response()->json([
-            'message' => $user->is_active ? 'User enabled.' : 'User disabled.',
+            'message' => $user->is_active ? 'User enabled.' : 'User disabled. All sessions revoked.',
             'is_active' => $user->is_active,
         ]);
     }
@@ -391,7 +396,7 @@ class AdminController extends Controller
                 SELECT
                     COALESCE((SELECT SUM(amount) FROM payments WHERE status = 'success' AND paid_at BETWEEN ? AND ?), 0) as revenue,
                     (SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ? AND deleted_at IS NULL) as new_users,
-                    (SELECT COUNT(*) FROM assessments WHERE created_at BETWEEN ? AND ?) as assessments,
+                    (SELECT COUNT(*) FROM assessments WHERE created_at BETWEEN ? AND ? AND COALESCE(is_template, 0) = 0) as assessments,
                     (SELECT COUNT(*) FROM invitees WHERE status = 'completed' AND updated_at BETWEEN ? AND ?) as tests_completed
             ", [$fromDate, $toDate, $fromDate, $toDate, $fromDate, $toDate, $fromDate, $toDate]);
 
@@ -399,7 +404,7 @@ class AdminController extends Controller
                 SELECT
                     COALESCE((SELECT SUM(amount) FROM payments WHERE status = 'success' AND paid_at BETWEEN ? AND ?), 0) as revenue,
                     (SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ? AND deleted_at IS NULL) as new_users,
-                    (SELECT COUNT(*) FROM assessments WHERE created_at BETWEEN ? AND ?) as assessments,
+                    (SELECT COUNT(*) FROM assessments WHERE created_at BETWEEN ? AND ? AND COALESCE(is_template, 0) = 0) as assessments,
                     (SELECT COUNT(*) FROM invitees WHERE status = 'completed' AND updated_at BETWEEN ? AND ?) as tests_completed
             ", [$prevFromDate, $prevToDate, $prevFromDate, $prevToDate, $prevFromDate, $prevToDate, $prevFromDate, $prevToDate]);
 
@@ -702,6 +707,224 @@ class AdminController extends Controller
         $assessment->delete();
 
         return response()->json(['message' => 'Assessment deleted successfully.']);
+    }
+
+    /**
+     * Toggle assessment template status
+     */
+    public function toggleTemplate(Request $request, string $id): JsonResponse
+    {
+        $assessment = Assessment::findOrFail($id);
+        $assessment->update(['is_template' => !$assessment->is_template]);
+
+        logger()->info('Admin toggled assessment template', [
+            'admin_id' => $request->user()->id,
+            'assessment_id' => $id,
+            'is_template' => $assessment->is_template,
+        ]);
+
+        return response()->json([
+            'message' => $assessment->is_template ? 'Assessment marked as template. Visible to all users in Question Bank.' : 'Template status removed.',
+            'is_template' => $assessment->is_template,
+        ]);
+    }
+
+    /**
+     * Create a new assessment template (admin only)
+     */
+    public function createTemplate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        // Create assessment owned by first user (system), marked as template
+        $firstUser = User::first();
+        if (!$firstUser) {
+            return response()->json(['message' => 'No users exist to own the template.'], 422);
+        }
+
+        $assessment = Assessment::create([
+            'user_id' => $firstUser->id,
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'is_template' => true,
+            'status' => 'draft',
+            'duration_minutes' => 60,
+            'passing_score' => 50,
+            'total_questions' => 0,
+        ]);
+
+        logger()->info('Admin created assessment template', [
+            'admin_id' => $request->user()->id,
+            'assessment_id' => $assessment->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Template created. Add questions now.',
+            'assessment' => $assessment,
+        ], 201);
+    }
+
+    /**
+     * Add question to a template assessment (admin)
+     */
+    public function addTemplateQuestion(Request $request, string $id): JsonResponse
+    {
+        $assessment = Assessment::findOrFail($id);
+
+        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem,shape_puzzle';
+        $noOptionTypes = ['text_input', 'fill_blank', 'numeric', 'mental_maths', 'word_problem', 'code_snippet'];
+        $skipCorrectValidation = ['ordering', 'drag_drop_sort', 'matching', 'likert_scale', 'shape_puzzle'];
+
+        $validated = $request->validate([
+            'question_text' => ['required', 'string', 'max:2000'],
+            'question_type' => ['required', "in:{$allTypes}"],
+            'points' => ['integer', 'min:1', 'max:100'],
+            'expected_answer' => ['nullable', 'string', 'max:1000'],
+            'options' => [in_array($request->question_type, $noOptionTypes) ? 'nullable' : 'sometimes', 'array', 'max:20'],
+            'options.*.text' => ['required', 'string', 'max:500'],
+            'options.*.is_correct' => ['required', 'boolean'],
+        ]);
+
+        return DB::transaction(function () use ($assessment, $validated, $noOptionTypes, $skipCorrectValidation) {
+            $qType = $validated['question_type'];
+
+            // Validate correct options
+            if (!in_array($qType, $noOptionTypes) && !in_array($qType, $skipCorrectValidation) && !empty($validated['options'])) {
+                $correctCount = collect($validated['options'])->where('is_correct', true)->count();
+                if ($correctCount === 0) {
+                    return response()->json(['message' => 'At least one option must be correct.'], 422);
+                }
+                if ($qType === 'single_choice' && $correctCount > 1) {
+                    return response()->json(['message' => 'Single choice can only have one correct answer.'], 422);
+                }
+            }
+
+            $maxOrder = $assessment->questions()->max('question_order') ?? 0;
+
+            $question = \App\Models\Question::create([
+                'assessment_id' => $assessment->id,
+                'question_text' => $validated['question_text'],
+                'question_type' => $validated['question_type'],
+                'expected_answer' => $validated['expected_answer'] ?? null,
+                'points' => $validated['points'] ?? 1,
+                'question_order' => $maxOrder + 1,
+            ]);
+
+            if (!empty($validated['options'])) {
+                $optionRows = [];
+                foreach ($validated['options'] as $index => $option) {
+                    $optionRows[] = [
+                        'id' => \Illuminate\Support\Str::uuid()->toString(),
+                        'question_id' => $question->id,
+                        'option_text' => $option['text'],
+                        'option_label' => chr(65 + $index),
+                        'is_correct' => $option['is_correct'],
+                        'option_order' => $index + 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                \App\Models\QuestionOption::insert($optionRows);
+            }
+
+            $assessment->update(['total_questions' => $assessment->questions()->count()]);
+
+            return response()->json([
+                'message' => 'Question added to template.',
+                'question' => $question->load('options'),
+            ], 201);
+        });
+    }
+
+    /**
+     * Update template assessment (title/description)
+     */
+    public function updateTemplate(Request $request, string $id): JsonResponse
+    {
+        $assessment = Assessment::findOrFail($id);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $assessment->update($validated);
+
+        return response()->json(['message' => 'Template updated.', 'assessment' => $assessment]);
+    }
+
+    /**
+     * Update a question in a template
+     */
+    public function updateTemplateQuestion(Request $request, string $id, string $questionId): JsonResponse
+    {
+        $assessment = Assessment::findOrFail($id);
+        $question = $assessment->questions()->findOrFail($questionId);
+
+        $allTypes = 'single_choice,multiple_choice,text_input,true_false,ordering,matching,fill_blank,numeric,sequence_pattern,matrix_pattern,odd_one_out,spatial_rotation,shape_assembly,analogy,drag_drop_sort,hotspot,code_snippet,likert_scale,pattern_recognition,mental_maths,word_problem,shape_puzzle';
+        $noOptionTypes = ['text_input', 'fill_blank', 'numeric', 'mental_maths', 'word_problem', 'code_snippet'];
+
+        $validated = $request->validate([
+            'question_text' => ['required', 'string', 'max:2000'],
+            'question_type' => ['required', "in:{$allTypes}"],
+            'points' => ['integer', 'min:1', 'max:100'],
+            'expected_answer' => ['nullable', 'string', 'max:1000'],
+            'options' => [in_array($request->question_type, $noOptionTypes) ? 'nullable' : 'sometimes', 'array', 'max:20'],
+            'options.*.text' => ['required', 'string', 'max:500'],
+            'options.*.is_correct' => ['required', 'boolean'],
+        ]);
+
+        return DB::transaction(function () use ($question, $validated) {
+            $question->update([
+                'question_text' => $validated['question_text'],
+                'question_type' => $validated['question_type'],
+                'expected_answer' => $validated['expected_answer'] ?? null,
+                'points' => $validated['points'] ?? 1,
+            ]);
+
+            // Replace options
+            $question->options()->delete();
+            if (!empty($validated['options'])) {
+                $optionRows = [];
+                foreach ($validated['options'] as $index => $option) {
+                    $optionRows[] = [
+                        'id' => \Illuminate\Support\Str::uuid()->toString(),
+                        'question_id' => $question->id,
+                        'option_text' => $option['text'],
+                        'option_label' => chr(65 + $index),
+                        'is_correct' => $option['is_correct'],
+                        'option_order' => $index + 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                \App\Models\QuestionOption::insert($optionRows);
+            }
+
+            return response()->json([
+                'message' => 'Question updated.',
+                'question' => $question->load('options'),
+            ]);
+        });
+    }
+
+    /**
+     * Delete a question from a template
+     */
+    public function deleteTemplateQuestion(Request $request, string $id, string $questionId): JsonResponse
+    {
+        $assessment = Assessment::findOrFail($id);
+        $question = $assessment->questions()->findOrFail($questionId);
+
+        $question->options()->delete();
+        $question->delete();
+
+        $assessment->update(['total_questions' => $assessment->questions()->count()]);
+
+        return response()->json(['message' => 'Question deleted.']);
     }
 
     // ========================================

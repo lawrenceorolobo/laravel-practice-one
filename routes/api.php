@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TestController;
 use App\Http\Middleware\EnsureActiveSubscription;
+use App\Http\Middleware\EnsureUserActive;
 use App\Http\Middleware\IdempotencyMiddleware;
 use App\Http\Middleware\RateLimitByTier;
 use App\Http\Middleware\SanitizeInput;
@@ -78,7 +79,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
     | Authenticated Business Admin Routes
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['auth:sanctum', RateLimitByTier::class . ':api'])->group(function () {
+    Route::middleware(['auth:sanctum', EnsureUserActive::class, RateLimitByTier::class . ':api'])->group(function () {
         // Auth
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/profile', [AuthController::class, 'me']);
@@ -99,6 +100,12 @@ Route::middleware([SanitizeInput::class])->group(function () {
         // Flutterwave Payments (requires auth, no subscription needed)
         Route::post('/payments/initialize', [\App\Http\Controllers\Api\PaymentController::class, 'initialize']);
 
+        // Templates (browse & clone — no subscription needed)
+        Route::get('/templates', [AssessmentController::class, 'templates']);
+        Route::get('/templates/{template}/questions', [AssessmentController::class, 'templateQuestions']);
+        Route::post('/templates/{template}/clone', [AssessmentController::class, 'cloneTemplate']);
+        Route::post('/assessments/{assessment}/import-questions', [AssessmentController::class, 'importFromTemplate']);
+
         /*
         |--------------------------------------------------------------------------
         | Subscription Required Routes
@@ -108,6 +115,7 @@ Route::middleware([SanitizeInput::class])->group(function () {
             // Assessments
             Route::apiResource('assessments', AssessmentController::class);
             Route::post('/assessments/{assessment}/publish', [AssessmentController::class, 'publish']);
+            Route::post('/assessments/{assessment}/duplicate', [AssessmentController::class, 'duplicate']);
             Route::get('/assessments/{assessment}/results', [AssessmentController::class, 'results']);
             Route::get('/assessments/{assessment}/analytics', [AssessmentController::class, 'analytics']);
             Route::get('/assessments/{assessment}/sessions/{session}/answers', [AssessmentController::class, 'sessionAnswers']);
@@ -168,6 +176,12 @@ Route::middleware([SanitizeInput::class])->group(function () {
         Route::get('/assessments', [AdminController::class, 'assessments']);
         Route::get('/assessments/{id}', [AdminController::class, 'showAssessment']);
         Route::delete('/assessments/{id}', [AdminController::class, 'deleteAssessment']);
+        Route::post('/assessments/{id}/toggle-template', [AdminController::class, 'toggleTemplate']);
+        Route::post('/templates', [AdminController::class, 'createTemplate']);
+        Route::put('/templates/{id}', [AdminController::class, 'updateTemplate']);
+        Route::post('/templates/{id}/questions', [AdminController::class, 'addTemplateQuestion']);
+        Route::put('/templates/{id}/questions/{questionId}', [AdminController::class, 'updateTemplateQuestion']);
+        Route::delete('/templates/{id}/questions/{questionId}', [AdminController::class, 'deleteTemplateQuestion']);
 
         // Feature Flags
         Route::get('/feature-flags', [AdminController::class, 'featureFlags']);

@@ -27,7 +27,7 @@ class TestController extends Controller
     public function validateToken(Request $request, string $token): JsonResponse
     {
         $invitee = Invitee::where('invite_token', $token)
-            ->with(['assessment:id,title,description,duration_minutes,start_datetime,end_datetime,status', 'testSession'])
+            ->with(['assessment:id,title,description,duration_minutes,start_datetime,end_datetime,status,auto_end_on_leave,webcam_required,proctoring_enabled,fullscreen_required,allow_back_navigation,shuffle_questions,shuffle_options', 'testSession'])
             ->firstOrFail();
 
         // Mark as opened if first time
@@ -38,8 +38,8 @@ class TestController extends Controller
         // Check if assessment is active
         if (!$assessment->isActive()) {
             $message = match (true) {
-                $assessment->start_datetime->isFuture() => 'This assessment has not started yet.',
-                $assessment->end_datetime->isPast() => 'This assessment has ended.',
+                $assessment->start_datetime && $assessment->start_datetime->isFuture() => 'This assessment has not started yet.',
+                ($assessment->end_datetime && $assessment->end_datetime->isPast()) => 'This assessment has ended.',
                 default => 'This assessment is not currently available.',
             };
 
@@ -70,6 +70,10 @@ class TestController extends Controller
                     'title' => $assessment->title,
                     'description' => $assessment->description,
                     'duration_minutes' => $assessment->duration_minutes,
+                    'auto_end_on_leave' => (bool) $assessment->auto_end_on_leave,
+                    'webcam_required' => (bool) $assessment->webcam_required,
+                    'proctoring_enabled' => (bool) $assessment->proctoring_enabled,
+                    'fullscreen_required' => (bool) $assessment->fullscreen_required,
                 ],
                 'email' => $invitee->email,
                 'started_at' => $existingSession->started_at,
@@ -84,6 +88,10 @@ class TestController extends Controller
                 'title' => $assessment->title,
                 'description' => $assessment->description,
                 'duration_minutes' => $assessment->duration_minutes,
+                'auto_end_on_leave' => (bool) $assessment->auto_end_on_leave,
+                'webcam_required' => (bool) $assessment->webcam_required,
+                'proctoring_enabled' => (bool) $assessment->proctoring_enabled,
+                'fullscreen_required' => (bool) $assessment->fullscreen_required,
             ],
             'email' => $invitee->email,
             'first_name' => $invitee->first_name,
@@ -248,10 +256,13 @@ class TestController extends Controller
                 'question_text' => $q->question_text,
                 'question_type' => $q->question_type,
                 'points' => $q->points,
+                'question_metadata' => $q->question_metadata,
                 'answered' => in_array($q->id, $answeredIds),
                 'options' => $options->map(fn ($o) => [
                     'label' => $o->option_label,
                     'text' => $o->option_text,
+                    'media_url' => $o->media_url ?? null,
+                    'media_type' => $o->media_type ?? null,
                 ])->values(),
             ];
         });
@@ -274,11 +285,13 @@ class TestController extends Controller
         $validated = $request->validate([
             'question_id' => ['required', 'uuid'],
             'selected_options' => ['nullable', 'array'],
-            'selected_options.*' => ['string', 'size:1'],
+            'selected_options.*' => ['string', 'max:500'],
             'text_answer' => ['nullable', 'string', 'max:5000'],
             'ordering' => ['nullable', 'array'],
             'ordering.*' => ['string'],
             'matching' => ['nullable', 'array'],
+            'puzzle' => ['nullable', 'array'],
+            'time_spent_seconds' => ['nullable', 'integer', 'min:0', 'max:86400'],
         ]);
 
         $invitee = Invitee::where('invite_token', $token)
@@ -318,6 +331,11 @@ class TestController extends Controller
             $textAnswer = json_encode($validated['matching']);
         }
 
+        // Puzzle: store as JSON string in text_answer (slot → piece mapping)
+        if (!empty($validated['puzzle'])) {
+            $textAnswer = json_encode($validated['puzzle']);
+        }
+
         // Use idempotent upsert
         $answer = TestAnswer::updateOrCreate(
             [
@@ -328,6 +346,7 @@ class TestController extends Controller
                 'selected_options' => $selectedOptions,
                 'text_answer' => $textAnswer,
                 'answered_at' => now(),
+                'time_spent_seconds' => $validated['time_spent_seconds'] ?? null,
             ]
         );
 
@@ -373,9 +392,11 @@ class TestController extends Controller
             ];
         }
 
+        // Load assessment with user for emails and broadcasting
+        $assessment = $invitee->assessment->load('user');
+
         // Send separate result emails (queued) — only if email notifications enabled
         if (feature('email_notifications')) {
-            $assessment = $invitee->assessment->load('user');
             dispatch(function () use ($assessment, $invitee, $session) {
                 try {
                     // Email to assessment creator (business admin)
@@ -463,7 +484,7 @@ class TestController extends Controller
         if (!$assessment->isActive()) {
             $message = match (true) {
                 $assessment->start_datetime && $assessment->start_datetime->isFuture() => 'This assessment has not started yet. It opens on ' . $assessment->start_datetime->format('M d, Y \a\t g:i A') . '.',
-                $assessment->end_datetime && $assessment->end_datetime->isPast() => 'This assessment has ended.',
+                ($assessment->end_datetime && $assessment->end_datetime->isPast()) => 'This assessment has ended.',
                 default => 'This assessment is not currently available.',
             };
 

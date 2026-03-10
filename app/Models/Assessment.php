@@ -37,6 +37,7 @@ class Assessment extends Model
         'access_code',
         'total_questions',
         'total_invites',
+        'is_template',
     ];
 
     protected function casts(): array
@@ -57,6 +58,7 @@ class Assessment extends Model
             'end_datetime' => 'datetime',
             'total_questions' => 'integer',
             'total_invites' => 'integer',
+            'is_template' => 'boolean',
         ];
     }
 
@@ -87,18 +89,20 @@ class Assessment extends Model
 
     public function isActive(): bool
     {
-        return $this->status === 'active' 
-            && now()->between($this->start_datetime, $this->end_datetime);
+        if ($this->status !== 'active') return false;
+        if ($this->start_datetime && $this->start_datetime->isFuture()) return false;
+        if ($this->end_datetime && $this->end_datetime->isPast()) return false;
+        return true;
     }
 
     public function isScheduled(): bool
     {
-        return $this->status === 'scheduled' && $this->start_datetime->isFuture();
+        return $this->status === 'scheduled' && $this->start_datetime && $this->start_datetime->isFuture();
     }
 
     public function isCompleted(): bool
     {
-        return $this->status === 'completed' || $this->end_datetime->isPast();
+        return $this->status === 'completed' || ($this->end_datetime && $this->end_datetime->isPast());
     }
 
     public function getMaxScoreAttribute(): int

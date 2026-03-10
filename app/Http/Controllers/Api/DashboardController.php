@@ -21,7 +21,7 @@ class DashboardController extends Controller
         $monthAgo = Carbon::now()->subDays(30)->toDateTimeString();
         $twoMonthsAgo = Carbon::now()->subDays(60)->toDateTimeString();
 
-        $assessmentIds = Assessment::where('user_id', $userId)->pluck('id')->all();
+        $assessmentIds = Assessment::where('user_id', $userId)->where('is_template', false)->pluck('id')->all();
 
         if (empty($assessmentIds)) {
             return response()->json([
@@ -36,8 +36,8 @@ class DashboardController extends Controller
 
         $stats = DB::selectOne("
             SELECT
-                (SELECT COUNT(*) FROM assessments WHERE user_id = ?) as total_assessments,
-                (SELECT COUNT(*) FROM assessments WHERE user_id = ? AND created_at >= ?) as assessments_this_week,
+                (SELECT COUNT(*) FROM assessments WHERE user_id = ? AND COALESCE(is_template, 0) = 0) as total_assessments,
+                (SELECT COUNT(*) FROM assessments WHERE user_id = ? AND COALESCE(is_template, 0) = 0 AND created_at >= ?) as assessments_this_week,
                 (SELECT COUNT(DISTINCT email) FROM invitees WHERE assessment_id IN ({$ph})) as total_candidates,
                 (SELECT COUNT(DISTINCT email) FROM invitees WHERE assessment_id IN ({$ph}) AND created_at >= ?) as candidates_this_week,
                 (SELECT COUNT(*) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status IN ('submitted','completed','timed_out')) as total_completed,
@@ -131,7 +131,7 @@ class DashboardController extends Controller
         $sevenDaysAgo = Carbon::now()->subDays(6)->startOfDay()->toDateTimeString();
         $thirtyDaysAgo = Carbon::now()->subDays(29)->startOfDay()->toDateTimeString();
 
-        $assessmentIds = Assessment::where('user_id', $userId)->pluck('id')->all();
+        $assessmentIds = Assessment::where('user_id', $userId)->where('is_template', false)->pluck('id')->all();
 
         if (empty($assessmentIds)) {
             $empty7 = [];
@@ -194,10 +194,10 @@ class DashboardController extends Controller
         // 3. Completion funnel
         $funnel = DB::selectOne("
             SELECT
-                (SELECT COUNT(*) FROM invitees WHERE assessment_id IN ({$ph})) as invited,
-                (SELECT COUNT(*) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status != 'in_progress') as started,
-                (SELECT COUNT(*) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status IN ('submitted','completed','timed_out')) as completed,
-                (SELECT COUNT(*) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status IN ('submitted','completed','timed_out') AND passed = 1) as passed
+                (SELECT COUNT(DISTINCT email) FROM invitees WHERE assessment_id IN ({$ph})) as invited,
+                (SELECT COUNT(DISTINCT email) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status != 'in_progress') as started,
+                (SELECT COUNT(DISTINCT email) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status IN ('submitted','completed','timed_out')) as completed,
+                (SELECT COUNT(DISTINCT email) FROM test_sessions WHERE assessment_id IN ({$ph}) AND status IN ('submitted','completed','timed_out') AND passed = 1) as passed
         ", array_merge($assessmentIds, $assessmentIds, $assessmentIds, $assessmentIds));
 
         // 4. Monthly trend (last 30 days)

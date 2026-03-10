@@ -14,8 +14,7 @@ Broadcast::channel('assessment.{assessmentId}', function ($user, $assessmentId) 
         ->exists();
 });
 
-// Admin channel
+// Admin channel — only super admins
 Broadcast::channel('admin', function ($user) {
-    // Check if authenticated via admin guard or has admin role
-    return true; // Admin auth is handled separately via adminToken
+    return $user instanceof \App\Models\Admin;
 });

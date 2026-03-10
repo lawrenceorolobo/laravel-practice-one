@@ -20,6 +20,12 @@ trait HasPublicUid
                 $model->{$uidColumn} = $model->generatePublicUid();
             }
         });
+
+        // Clear public UID on replicate so creating hook generates a fresh one
+        static::replicating(function ($model) {
+            $uidColumn = $model->getUidColumn();
+            $model->{$uidColumn} = null;
+        });
     }
 
     /**

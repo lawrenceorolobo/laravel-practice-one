@@ -155,7 +155,7 @@
         .dark .badge-info { background: rgba(99,102,241,0.12); color: #818cf8; }
 
         /* ── Form inputs ── */
-        input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], textarea, select {
+        input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="date"], textarea, select {
             background: var(--input-bg) !important; border: 1px solid var(--border) !important; color: var(--text-primary) !important; border-radius: 10px !important;
             transition: border-color .15s, box-shadow .15s; font-size: 13px; padding: 8px 12px;
         }
@@ -163,6 +163,13 @@
             border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important; outline: none !important;
         }
         input::placeholder, textarea::placeholder { color: var(--text-muted) !important; }
+        input[type="date"] { cursor: pointer; position: relative; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            width: auto; height: auto; color: transparent; background: transparent; cursor: pointer;
+        }
+        .dark input[type="date"] { color-scheme: dark; }
+        .dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(0.8); }
         textarea { resize: vertical; }
 
         /* ── Select / Dropdown ── */

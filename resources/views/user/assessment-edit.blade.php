@@ -39,8 +39,8 @@
                     <input type="datetime-local" name="start_datetime" required class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-2">End Date & Time *</label>
-                    <input type="datetime-local" name="end_datetime" required class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500">
+                    <label class="block text-sm font-medium mb-2">End Date & Time <span class="text-slate-400 text-xs">(optional)</span></label>
+                    <input type="datetime-local" name="end_datetime" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500">
                 </div>
             </div>
         </div>
@@ -147,6 +147,21 @@ async function loadAssessment() {
         // Datetime fields
         document.querySelector('[name="start_datetime"]').value = toLocalDatetime(data.start_datetime);
         document.querySelector('[name="end_datetime"]').value = toLocalDatetime(data.end_datetime);
+
+        // Store status for form submission logic
+        window._assessmentStatus = data.status;
+
+        // For non-draft: disable content fields, keep schedule editable
+        if (data.status !== 'draft') {
+            ['title', 'description', 'pass_percentage'].forEach(n => {
+                const el = document.querySelector(`[name="${n}"]`);
+                if (el) { el.disabled = true; el.classList.add('opacity-60'); }
+            });
+            ['shuffle_questions', 'shuffle_options', 'allow_back_navigation', 'proctoring_enabled', 'webcam_required', 'fullscreen_required', 'auto_end_on_leave', 'send_answers_to_taker'].forEach(n => {
+                const el = document.querySelector(`[name="${n}"]`);
+                if (el) { el.disabled = true; el.classList.add('opacity-60'); }
+            });
+        }
         
         // Checkboxes
         const checks = {
@@ -198,23 +213,34 @@ document.getElementById('editForm').addEventListener('submit', async (e) => {
     btn.textContent = 'Saving...';
     errorMsg.classList.add('hidden');
     
-    const payload = {
-        title: form.title.value,
-        description: form.description.value || null,
-        duration_minutes: parseInt(form.duration_minutes.value),
-        pass_percentage: parseFloat(form.pass_percentage.value),
-        start_datetime: form.start_datetime.value,
-        end_datetime: form.end_datetime.value,
-        shuffle_questions: form.shuffle_questions.checked,
-        shuffle_options: form.shuffle_options.checked,
-        show_result_to_taker: form.show_result_to_taker.checked,
-        allow_back_navigation: form.allow_back_navigation.checked,
-        proctoring_enabled: form.proctoring_enabled.checked,
-        webcam_required: form.webcam_required.checked,
-        fullscreen_required: form.fullscreen_required.checked,
-        auto_end_on_leave: form.auto_end_on_leave.checked,
-        send_answers_to_taker: form.send_answers_to_taker.checked,
-    };
+    // For non-draft assessments, only send schedule fields
+    let payload;
+    if (window._assessmentStatus && window._assessmentStatus !== 'draft') {
+        payload = {
+            start_datetime: form.start_datetime.value,
+            end_datetime: form.end_datetime.value || null,
+            duration_minutes: parseInt(form.duration_minutes.value),
+            show_result_to_taker: form.show_result_to_taker.checked,
+        };
+    } else {
+        payload = {
+            title: form.title.value,
+            description: form.description.value || null,
+            duration_minutes: parseInt(form.duration_minutes.value),
+            pass_percentage: parseFloat(form.pass_percentage.value),
+            start_datetime: form.start_datetime.value,
+            end_datetime: form.end_datetime.value || null,
+            shuffle_questions: form.shuffle_questions.checked,
+            shuffle_options: form.shuffle_options.checked,
+            show_result_to_taker: form.show_result_to_taker.checked,
+            allow_back_navigation: form.allow_back_navigation.checked,
+            proctoring_enabled: form.proctoring_enabled.checked,
+            webcam_required: form.webcam_required.checked,
+            fullscreen_required: form.fullscreen_required.checked,
+            auto_end_on_leave: form.auto_end_on_leave.checked,
+            send_answers_to_taker: form.send_answers_to_taker.checked,
+        };
+    }
     
     try {
         const res = await fetch(`/api/assessments/${id}`, {

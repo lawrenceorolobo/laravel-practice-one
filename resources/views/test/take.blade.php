@@ -178,6 +178,23 @@
                         <div id="patternVisual" class="flex justify-center mb-6"></div>
                         <div id="patternOptions" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
                     </div>
+
+                    <!-- Shape Puzzle (Duolingo-style drag & drop) -->
+                    <div id="shapePuzzleContainer" class="hidden">
+                        <p class="text-sm text-slate-500 mb-3">Drag each piece into its matching slot:</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Target slots -->
+                            <div>
+                                <p class="text-xs font-semibold text-slate-400 mb-2 uppercase">Target</p>
+                                <div id="puzzleSlots" class="space-y-3"></div>
+                            </div>
+                            <!-- Draggable pieces -->
+                            <div>
+                                <p class="text-xs font-semibold text-slate-400 mb-2 uppercase">Pieces</p>
+                                <div id="puzzlePieces" class="space-y-2"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Navigation -->
@@ -277,6 +294,8 @@ let webcamStream = null;
 let mediaRecorder = null;
 let recordedChunks = [];
 let isSubmitting = false;
+let questionStartTime = null; // Per-question timer
+let questionTimes = {}; // Accumulated time per question ID
 
 const CLOUDINARY_CLOUD = '{{ config("services.cloudinary.cloud_name", "") }}';
 const CLOUDINARY_PRESET = '{{ config("services.cloudinary.upload_preset", "") }}';
@@ -450,7 +469,7 @@ function showQuiz(assessment) {
 
 async function startWebcam() {
     try {
-        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         const video = document.getElementById('webcamVideo');
         video.srcObject = webcamStream;
         document.getElementById('webcamOverlay').classList.remove('hidden');
@@ -565,15 +584,23 @@ async function loadQuestions() {
 }
 
 function renderQuestion() {
+    // Track time on previous question
+    if (questionStartTime && questions[currentIndex]) {
+        const prevQ = questions[currentIndex];
+        const elapsed = Math.round((Date.now() - questionStartTime) / 1000);
+        questionTimes[prevQ.id] = (questionTimes[prevQ.id] || 0) + elapsed;
+    }
+    questionStartTime = Date.now();
+
     const q = questions[currentIndex];
     document.getElementById('currentQ').textContent = currentIndex + 1;
     document.getElementById('questionText').textContent = q.question_text;
     document.getElementById('questionBadge').textContent = 'Q' + (currentIndex + 1);
-    const typeLabels = {single_choice:'Single Choice',multiple_choice:'Multiple Choice',text_input:'Text Answer',true_false:'True/False',ordering:'Ordering',matching:'Matching',fill_blank:'Fill in Blank',numeric:'Numeric',sequence_pattern:'Pattern Sequence',matrix_pattern:'Matrix',odd_one_out:'Odd One Out',spatial_rotation:'Spatial',shape_assembly:'Shape Assembly',analogy:'Analogy',drag_drop_sort:'Drag & Drop',hotspot:'Hotspot',code_snippet:'Code',likert_scale:'Rating',pattern_recognition:'Pattern Recognition',mental_maths:'Mental Maths',word_problem:'Word Problem'};
+    const typeLabels = {single_choice:'Single Choice',multiple_choice:'Multiple Choice',text_input:'Text Answer',true_false:'True/False',ordering:'Ordering',matching:'Matching',fill_blank:'Fill in Blank',numeric:'Numeric',sequence_pattern:'Pattern Sequence',matrix_pattern:'Matrix',odd_one_out:'Odd One Out',spatial_rotation:'Spatial',shape_assembly:'Shape Assembly',analogy:'Analogy',drag_drop_sort:'Drag & Drop',hotspot:'Hotspot',code_snippet:'Code',likert_scale:'Rating',pattern_recognition:'Pattern Recognition',mental_maths:'Mental Maths',word_problem:'Word Problem',shape_puzzle:'Shape Puzzle'};
     document.getElementById('questionType').textContent = typeLabels[q.question_type] || q.question_type;
 
     // Hide all containers
-    const containers = ['optionsContainer','textAnswerContainer','numericContainer','fillBlankContainer','orderingContainer','matchingContainer','likertContainer','patternContainer'];
+    const containers = ['optionsContainer','textAnswerContainer','numericContainer','fillBlankContainer','orderingContainer','matchingContainer','likertContainer','patternContainer','shapePuzzleContainer'];
     containers.forEach(id => document.getElementById(id).classList.add('hidden'));
 
     const type = q.question_type;
@@ -603,6 +630,9 @@ function renderQuestion() {
     } else if (patternTypes.includes(type)) {
         document.getElementById('patternContainer').classList.remove('hidden');
         renderPatternQuestion(q);
+    } else if (type === 'shape_puzzle') {
+        document.getElementById('shapePuzzleContainer').classList.remove('hidden');
+        renderShapePuzzle(q);
     } else if (choiceTypes.includes(type)) {
         document.getElementById('optionsContainer').classList.remove('hidden');
         const selectedOpts = answers[q.id]?.options || [];
@@ -646,26 +676,172 @@ function renderQuestion() {
 }
 
 // Ordering / Drag-Drop Sort
+let dragSrcIdx = null;
+
 function renderOrderingQuestion(q) {
     const saved = answers[q.id]?.ordering;
     let items = saved ? saved : q.options.map(o => ({label: o.label, text: o.text}));
 
     const list = document.getElementById('orderingList');
     list.innerHTML = items.map((item, i) => `
-        <div class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg" data-idx="${i}">
+        <div class="flex items-center gap-3 p-3 bg-slate-50 border-2 border-slate-200 rounded-lg cursor-grab active:cursor-grabbing transition-all"
+             draggable="true" data-idx="${i}"
+             ondragstart="onDragStart(event, ${i})"
+             ondragover="onDragOver(event, ${i})"
+             ondrop="onDragDrop(event, ${i})"
+             ondragend="onDragEnd(event)"
+             ondragleave="this.style.borderTopColor='';this.style.borderTopWidth=''"
+             style="user-select:none">
+            <svg class="w-5 h-5 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
             <span class="text-sm font-bold text-slate-400 w-6">${i + 1}.</span>
             <span class="flex-1 font-medium text-slate-700">${item.text}</span>
             <div class="flex flex-col gap-0.5">
-                <button onclick="moveOrderItem(${i}, -1)" class="p-1 hover:bg-slate-200 rounded text-slate-500 ${i === 0 ? 'opacity-30' : ''}" ${i === 0 ? 'disabled' : ''}>
+                <button onclick="event.stopPropagation();moveOrderItem(${i}, -1)" class="p-1 hover:bg-slate-200 rounded text-slate-500 ${i === 0 ? 'opacity-30' : ''}" ${i === 0 ? 'disabled' : ''}>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
                 </button>
-                <button onclick="moveOrderItem(${i}, 1)" class="p-1 hover:bg-slate-200 rounded text-slate-500 ${i === items.length - 1 ? 'opacity-30' : ''}" ${i === items.length - 1 ? 'disabled' : ''}>
+                <button onclick="event.stopPropagation();moveOrderItem(${i}, 1)" class="p-1 hover:bg-slate-200 rounded text-slate-500 ${i === items.length - 1 ? 'opacity-30' : ''}" ${i === items.length - 1 ? 'disabled' : ''}>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>
             </div>
         </div>
     `).join('');
 }
+
+function onDragStart(e, idx) {
+    dragSrcIdx = idx;
+    e.currentTarget.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+}
+function onDragOver(e, idx) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragSrcIdx !== null && dragSrcIdx !== idx) {
+        e.currentTarget.style.borderTopColor = '#6366f1';
+        e.currentTarget.style.borderTopWidth = '3px';
+    }
+}
+function onDragDrop(e, targetIdx) {
+    e.preventDefault();
+    e.currentTarget.style.borderTopColor = '';
+    e.currentTarget.style.borderTopWidth = '';
+    if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+    const q = questions[currentIndex];
+    if (!answers[q.id]) answers[q.id] = {};
+    let items = answers[q.id].ordering || q.options.map(o => ({label: o.label, text: o.text}));
+    const moved = items.splice(dragSrcIdx, 1)[0];
+    items.splice(targetIdx, 0, moved);
+    answers[q.id].ordering = items;
+    dragSrcIdx = null;
+    renderOrderingQuestion(q);
+    saveAnswer(q.id);
+    renderQuestionNav();
+}
+function onDragEnd(e) {
+    e.currentTarget.style.opacity = '1';
+    dragSrcIdx = null;
+    document.querySelectorAll('#orderingList > div').forEach(el => {
+        el.style.borderTopColor = '';
+        el.style.borderTopWidth = '';
+    });
+}
+
+// ─── Touch support for ordering drag-drop (mobile/tablet) ───
+(function initTouchDrag() {
+    let touchSrcIdx = null;
+    let touchClone = null;
+    let touchContainer = null;
+
+    document.addEventListener('touchstart', function(e) {
+        const item = e.target.closest('#orderingList > div[draggable]');
+        if (!item) return;
+        touchSrcIdx = parseInt(item.dataset.idx);
+        touchContainer = item.parentElement;
+        // Create ghost clone
+        touchClone = item.cloneNode(true);
+        touchClone.style.cssText = 'position:fixed;pointer-events:none;opacity:0.8;z-index:9999;width:' + item.offsetWidth + 'px;transform:rotate(2deg);';
+        document.body.appendChild(touchClone);
+        item.style.opacity = '0.3';
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+        if (touchSrcIdx === null || !touchClone) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        touchClone.style.left = (t.clientX - 40) + 'px';
+        touchClone.style.top = (t.clientY - 20) + 'px';
+        // Highlight drop target
+        const target = document.elementFromPoint(t.clientX, t.clientY)?.closest('#orderingList > div[draggable]');
+        touchContainer?.querySelectorAll(':scope > div').forEach(el => { el.style.borderTopColor = ''; el.style.borderTopWidth = ''; });
+        if (target && parseInt(target.dataset.idx) !== touchSrcIdx) {
+            target.style.borderTopColor = '#6366f1';
+            target.style.borderTopWidth = '3px';
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchend', function(e) {
+        if (touchSrcIdx === null) return;
+        if (touchClone) { touchClone.remove(); touchClone = null; }
+        touchContainer?.querySelectorAll(':scope > div').forEach(el => { el.style.opacity = '1'; el.style.borderTopColor = ''; el.style.borderTopWidth = ''; });
+        const t = e.changedTouches[0];
+        const target = document.elementFromPoint(t.clientX, t.clientY)?.closest('#orderingList > div[draggable]');
+        if (target) {
+            const targetIdx = parseInt(target.dataset.idx);
+            if (targetIdx !== touchSrcIdx) {
+                const q = questions[currentIndex];
+                if (!answers[q.id]) answers[q.id] = {};
+                let items = answers[q.id].ordering || q.options.map(o => ({label: o.label, text: o.text}));
+                const moved = items.splice(touchSrcIdx, 1)[0];
+                items.splice(targetIdx, 0, moved);
+                answers[q.id].ordering = items;
+                renderOrderingQuestion(q);
+                saveAnswer(q.id);
+                renderQuestionNav();
+            }
+        }
+        touchSrcIdx = null;
+    }, { passive: true });
+
+    // Touch support for puzzle pieces
+    let puzzleTouchPiece = null;
+    let puzzleTouchClone = null;
+
+    document.addEventListener('touchstart', function(e) {
+        const piece = e.target.closest('#puzzlePieces > div[draggable]');
+        if (!piece) return;
+        puzzleTouchPiece = piece.querySelector('span.font-medium')?.textContent;
+        puzzleTouchClone = piece.cloneNode(true);
+        puzzleTouchClone.style.cssText = 'position:fixed;pointer-events:none;opacity:0.8;z-index:9999;width:' + piece.offsetWidth + 'px;';
+        document.body.appendChild(puzzleTouchClone);
+        piece.style.opacity = '0.3';
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+        if (!puzzleTouchPiece || !puzzleTouchClone) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        puzzleTouchClone.style.left = (t.clientX - 40) + 'px';
+        puzzleTouchClone.style.top = (t.clientY - 20) + 'px';
+    }, { passive: false });
+
+    document.addEventListener('touchend', function(e) {
+        if (!puzzleTouchPiece) return;
+        if (puzzleTouchClone) { puzzleTouchClone.remove(); puzzleTouchClone = null; }
+        document.querySelectorAll('#puzzlePieces > div').forEach(el => el.style.opacity = '1');
+        const t = e.changedTouches[0];
+        const slot = document.elementFromPoint(t.clientX, t.clientY)?.closest('#puzzleSlots > div[id^="slot_"]');
+        if (slot) {
+            const slotId = slot.id;
+            const q = questions[currentIndex];
+            if (!answers[q.id]) answers[q.id] = {};
+            if (!answers[q.id].puzzle) answers[q.id].puzzle = {};
+            answers[q.id].puzzle[slotId] = puzzleTouchPiece;
+            renderShapePuzzle(q);
+            saveAnswer(q.id);
+            renderQuestionNav();
+        }
+        puzzleTouchPiece = null;
+    }, { passive: true });
+})();
 
 function moveOrderItem(idx, dir) {
     const q = questions[currentIndex];
@@ -680,6 +856,193 @@ function moveOrderItem(idx, dir) {
     renderQuestionNav();
 }
 
+// Pattern / Visual Questions — SVG-based renderer
+function renderPatternQuestion(q) {
+    const meta = q.question_metadata || {};
+    const visual = document.getElementById('patternVisual');
+    const optsEl = document.getElementById('patternOptions');
+    const selectedOpts = answers[q.id]?.options || [];
+
+    // If visual_pattern metadata exists, render SVG patterns
+    if (meta.visual_pattern) {
+        const vp = meta.visual_pattern;
+
+        if (vp.type === 'sequence') {
+            // Sequence of SVG cells with a "?" at the end
+            const cells = (vp.cells || []).map(c => renderPatternCell(c, 80));
+            cells.push(`<div class="w-20 h-20 border-2 border-dashed border-red-400 rounded-lg flex items-center justify-center bg-red-50"><span class="text-2xl font-bold text-red-500">?</span></div>`);
+            visual.innerHTML = `<div class="flex flex-wrap items-center gap-3 justify-center p-4 bg-slate-50 rounded-xl border">${cells.join('<span class="text-slate-300 text-lg">→</span>')}</div>`;
+        } else if (vp.type === 'matrix') {
+            // 3x3 grid with missing piece (bottom-right = ?)
+            const cells = (vp.cells || []).map(c => renderPatternCell(c, 72));
+            // Replace last cell with ?
+            if (cells.length >= 9) cells[8] = `<div class="w-[72px] h-[72px] border-2 border-dashed border-red-400 rounded flex items-center justify-center bg-red-50"><span class="text-xl font-bold text-red-500">?</span></div>`;
+            visual.innerHTML = `<div class="grid grid-cols-3 gap-2 justify-items-center p-4 bg-slate-50 rounded-xl border max-w-[280px] mx-auto">${cells.join('')}</div>`;
+        } else if (vp.type === 'rotation') {
+            const cells = (vp.cells || []).map(c => renderPatternCell(c, 90));
+            visual.innerHTML = `<div class="flex flex-wrap items-center gap-4 justify-center p-4 bg-slate-50 rounded-xl border">${cells.join('')}<div class="w-[90px] h-[90px] border-2 border-dashed border-red-400 rounded-lg flex items-center justify-center bg-red-50"><span class="text-2xl font-bold text-red-500">?</span></div></div>`;
+        } else {
+            visual.innerHTML = `<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-6 text-center"><p class="text-lg text-slate-500">Observe the pattern and select the correct answer</p></div>`;
+        }
+
+        // Render options as visual cells too
+        if (q.options && q.options.length > 0) {
+            const vpOpts = vp.option_cells || [];
+            optsEl.innerHTML = q.options.map((opt, i) => {
+                const isSelected = selectedOpts.includes(opt.label);
+                const cellData = vpOpts[i];
+                const cellSvg = cellData ? renderPatternCell(cellData, 64) : '';
+                return `<label class="relative flex flex-col items-center p-3 border-2 rounded-xl cursor-pointer transition-all
+                    ${isSelected ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}"
+                    onclick="selectPatternOption('${opt.label}')">
+                    <input type="radio" name="pattern_opt" value="${opt.label}" ${isSelected ? 'checked' : ''} class="absolute top-2 right-2 text-indigo-600">
+                    ${cellSvg}
+                    <div class="flex items-center gap-1 mt-1">
+                        <span class="font-bold text-sm ${isSelected ? 'text-indigo-600' : 'text-slate-500'}">${opt.label}.</span>
+                        ${opt.text ? `<span class="text-xs ${isSelected ? 'text-indigo-700' : 'text-slate-500'}">${opt.text}</span>` : ''}
+                    </div>
+                </label>`;
+            }).join('');
+            return;
+        }
+    }
+
+    // Fallback: image or hint
+    if (meta.media_url) {
+        visual.innerHTML = `<img src="${meta.media_url}" class="max-h-64 object-contain rounded-lg border border-slate-200 shadow" alt="Question pattern">`;
+    } else {
+        const typeHints = {
+            shape_assembly: '🧩 Arrange the shapes to complete the figure',
+            spatial_rotation: '🔄 Select the correctly rotated shape',
+            matrix_pattern: '🔢 Find the pattern in the matrix',
+            sequence_pattern: '📐 What comes next in the sequence?',
+            pattern_recognition: '🔍 Identify the pattern',
+            hotspot: '📍 Select the correct area',
+        };
+        visual.innerHTML = `<div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-6 text-center">
+            <p class="text-lg text-slate-500">${typeHints[q.question_type] || 'Select the correct answer'}</p>
+        </div>`;
+    }
+
+    // Render options
+    if (q.options && q.options.length > 0) {
+        optsEl.innerHTML = q.options.map(opt => {
+            const isSelected = selectedOpts.includes(opt.label);
+            const hasImage = opt.media_url;
+            return `<label class="relative flex flex-col items-center p-3 border-2 rounded-xl cursor-pointer transition-all
+                ${isSelected ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}"
+                onclick="selectPatternOption('${opt.label}')">
+                <input type="radio" name="pattern_opt" value="${opt.label}" ${isSelected ? 'checked' : ''} class="absolute top-2 right-2 text-indigo-600">
+                ${hasImage ? `<img src="${opt.media_url}" class="w-full h-24 object-contain rounded mb-2" alt="${opt.label}">` : ''}
+                <div class="flex items-center gap-1">
+                    <span class="font-bold text-sm ${isSelected ? 'text-indigo-600' : 'text-slate-500'}">${opt.label}.</span>
+                    <span class="text-sm ${isSelected ? 'text-indigo-700' : 'text-slate-700'}">${opt.text}</span>
+                </div>
+            </label>`;
+        }).join('');
+    } else {
+        optsEl.innerHTML = '<p class="col-span-full text-center text-slate-400">No options available</p>';
+    }
+}
+
+/**
+ * Render a single SVG pattern cell from JSON data
+ * Cell format: { shapes: [{type, x, y, w, h, fill, rotate, ...}], bg: '#fff' }
+ */
+function renderPatternCell(cell, size) {
+    if (!cell || !cell.shapes) return `<div class="border rounded bg-white" style="width:${size}px;height:${size}px"></div>`;
+
+    const s = size;
+    let svgContent = '';
+
+    for (const shape of cell.shapes) {
+        const fill = shape.fill || '#1e293b';
+        const stroke = shape.stroke || 'none';
+        const sw = shape.strokeWidth || 1;
+        const opacity = shape.opacity || 1;
+        // Scale coordinates from 0-100 to actual size
+        const sx = (v) => (v / 100) * s;
+
+        const transform = shape.rotate ? `transform="rotate(${shape.rotate} ${sx(shape.cx || 50)} ${sx(shape.cy || 50)})"` : '';
+
+        switch (shape.type) {
+            case 'rect':
+                svgContent += `<rect x="${sx(shape.x||0)}" y="${sx(shape.y||0)}" width="${sx(shape.w||100)}" height="${sx(shape.h||100)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}" ${transform}/>`;
+                break;
+            case 'circle':
+                svgContent += `<circle cx="${sx(shape.cx||50)}" cy="${sx(shape.cy||50)}" r="${sx(shape.r||20)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}" ${transform}/>`;
+                break;
+            case 'triangle':
+                const tx = shape.x || 50, ty = shape.y || 20, ts = shape.size || 40;
+                const p1 = `${sx(tx)},${sx(ty)}`;
+                const p2 = `${sx(tx - ts/2)},${sx(ty + ts)}`;
+                const p3 = `${sx(tx + ts/2)},${sx(ty + ts)}`;
+                svgContent += `<polygon points="${p1} ${p2} ${p3}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}" ${transform}/>`;
+                break;
+            case 'line':
+                svgContent += `<line x1="${sx(shape.x1||10)}" y1="${sx(shape.y1||50)}" x2="${sx(shape.x2||90)}" y2="${sx(shape.y2||50)}" stroke="${fill}" stroke-width="${sx(shape.sw||3)}" stroke-linecap="round" ${transform}/>`;
+                break;
+            case 'arrow':
+                const ax1 = sx(shape.x1||10), ay1 = sx(shape.y1||50), ax2 = sx(shape.x2||90), ay2 = sx(shape.y2||50);
+                const alen = sx(shape.headSize||8);
+                const angle = Math.atan2(ay2-ay1, ax2-ax1);
+                const ah1x = ax2 - alen * Math.cos(angle - 0.5);
+                const ah1y = ay2 - alen * Math.sin(angle - 0.5);
+                const ah2x = ax2 - alen * Math.cos(angle + 0.5);
+                const ah2y = ay2 - alen * Math.sin(angle + 0.5);
+                svgContent += `<line x1="${ax1}" y1="${ay1}" x2="${ax2}" y2="${ay2}" stroke="${fill}" stroke-width="${sx(shape.sw||3)}" stroke-linecap="round" ${transform}/>`;
+                svgContent += `<polygon points="${ax2},${ay2} ${ah1x},${ah1y} ${ah2x},${ah2y}" fill="${fill}" ${transform}/>`;
+                // Double arrow?
+                if (shape.double) {
+                    const bh1x = ax1 + alen * Math.cos(angle - 0.5);
+                    const bh1y = ay1 + alen * Math.sin(angle - 0.5);
+                    const bh2x = ax1 + alen * Math.cos(angle + 0.5);
+                    const bh2y = ay1 + alen * Math.sin(angle + 0.5);
+                    svgContent += `<polygon points="${ax1},${ay1} ${bh1x},${bh1y} ${bh2x},${bh2y}" fill="${fill}" ${transform}/>`;
+                }
+                break;
+            case 'diamond':
+                const dx = shape.cx || 50, dy = shape.cy || 50, dr = shape.r || 20;
+                svgContent += `<polygon points="${sx(dx)},${sx(dy-dr)} ${sx(dx+dr)},${sx(dy)} ${sx(dx)},${sx(dy+dr)} ${sx(dx-dr)},${sx(dy)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}" ${transform}/>`;
+                break;
+            case 'star':
+                svgContent += generateStar(sx(shape.cx||50), sx(shape.cy||50), sx(shape.r||20), fill, transform);
+                break;
+            case 'cross':
+                const ccx = sx(shape.cx||50), ccy = sx(shape.cy||50), cr = sx(shape.r||20), ct = sx(shape.t||6);
+                svgContent += `<rect x="${ccx-ct/2}" y="${ccy-cr}" width="${ct}" height="${cr*2}" fill="${fill}" ${transform}/>`;
+                svgContent += `<rect x="${ccx-cr}" y="${ccy-ct/2}" width="${cr*2}" height="${ct}" fill="${fill}" ${transform}/>`;
+                break;
+            case 'text':
+                svgContent += `<text x="${sx(shape.x||50)}" y="${sx(shape.y||55)}" text-anchor="middle" dominant-baseline="middle" font-size="${sx(shape.fontSize||20)}" font-weight="${shape.bold?'bold':'normal'}" fill="${fill}" ${transform}>${shape.content||''}</text>`;
+                break;
+        }
+    }
+
+    const bg = cell.bg || '#ffffff';
+    const border = cell.border || '#cbd5e1';
+    return `<div class="rounded-lg overflow-hidden border-2" style="width:${s}px;height:${s}px;border-color:${border}">
+        <svg viewBox="0 0 ${s} ${s}" width="${s}" height="${s}"><rect width="${s}" height="${s}" fill="${bg}"/>${svgContent}</svg>
+    </div>`;
+}
+
+function generateStar(cx, cy, r, fill, transform) {
+    let points = '';
+    for (let i = 0; i < 10; i++) {
+        const angle = (i * Math.PI / 5) - Math.PI / 2;
+        const rad = i % 2 === 0 ? r : r * 0.4;
+        points += `${cx + rad * Math.cos(angle)},${cy + rad * Math.sin(angle)} `;
+    }
+    return `<polygon points="${points.trim()}" fill="${fill}" ${transform}/>`;
+}
+
+function selectPatternOption(label) {
+    const q = questions[currentIndex];
+    answers[q.id] = { options: [label] };
+    renderPatternQuestion(q);
+    saveAnswer(q.id);
+    renderQuestionNav();
+}
 // Matching
 function renderMatchingQuestion(q) {
     const meta = q.question_metadata || {};
@@ -728,6 +1091,98 @@ function renderLikertQuestion(q) {
             </label>
         `;
     }).join('');
+}
+
+
+// Shape Puzzle (Duolingo-style drag and fit)
+let puzzleDragPiece = null;
+
+function renderShapePuzzle(q) {
+    const meta = q.question_metadata || {};
+    const saved = answers[q.id]?.puzzle || {};
+    const options = q.options || [];
+
+    // Slots = the target positions (labeled A, B, C...)
+    // Pieces = the items that need to be dragged into slots (shuffled)
+    const slots = options.map((o, i) => ({ id: `slot_${i}`, label: o.option_label || o.label, text: o.option_text || o.text }));
+    const pieces = [...options].sort(() => Math.random() - 0.5);
+
+    // Already placed pieces
+    const placed = saved || {};
+
+    const slotsEl = document.getElementById('puzzleSlots');
+    slotsEl.innerHTML = slots.map(slot => {
+        const placedPiece = placed[slot.id];
+        return `
+            <div class="relative border-2 border-dashed rounded-xl p-4 min-h-[60px] flex items-center transition-all
+                ${placedPiece ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 bg-slate-50/50'}"
+                id="${slot.id}"
+                ondragover="event.preventDefault(); this.classList.add('border-indigo-500','bg-indigo-50/80')"
+                ondragleave="this.classList.remove('border-indigo-500','bg-indigo-50/80')"
+                ondrop="puzzleDrop(event, '${slot.id}')">
+                <span class="absolute -top-2.5 left-3 bg-white px-1.5 text-xs font-bold text-slate-400">${slot.label}</span>
+                ${placedPiece
+                    ? `<div class="flex items-center gap-2 w-full">
+                         <span class="flex-1 font-medium text-indigo-700 text-sm">${placedPiece}</span>
+                         <button onclick="removePuzzlePiece('${slot.id}')" class="text-red-400 hover:text-red-600 text-xs p-1">✕</button>
+                       </div>`
+                    : '<span class="text-slate-400 text-sm italic">Drop piece here...</span>'
+                }
+            </div>`;
+    }).join('');
+
+    // Show only pieces that haven't been placed yet
+    const placedTexts = Object.values(placed);
+    const availablePieces = pieces.filter(p => !placedTexts.includes(p.option_text || p.text));
+
+    const piecesEl = document.getElementById('puzzlePieces');
+    piecesEl.innerHTML = availablePieces.map(piece => {
+        const text = piece.option_text || piece.text;
+        return `
+            <div class="flex items-center gap-3 p-3 bg-white border-2 border-slate-200 rounded-xl cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md hover:border-indigo-300 transition-all"
+                 draggable="true"
+                 ondragstart="puzzleDragStart(event, '${text.replace(/'/g, "\\'")}')"
+                 ondragend="this.style.opacity='1'"
+                 style="user-select:none">
+                <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+                <span class="font-medium text-slate-700 text-sm">${text}</span>
+            </div>`;
+    }).join('');
+
+    if (availablePieces.length === 0 && Object.keys(placed).length > 0) {
+        piecesEl.innerHTML = '<p class="text-center text-emerald-500 text-sm font-medium py-3">✓ All pieces placed!</p>';
+    }
+}
+
+function puzzleDragStart(e, text) {
+    puzzleDragPiece = text;
+    e.currentTarget.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function puzzleDrop(e, slotId) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('border-indigo-500', 'bg-indigo-50/80');
+    if (!puzzleDragPiece) return;
+
+    const q = questions[currentIndex];
+    if (!answers[q.id]) answers[q.id] = {};
+    if (!answers[q.id].puzzle) answers[q.id].puzzle = {};
+    answers[q.id].puzzle[slotId] = puzzleDragPiece;
+    puzzleDragPiece = null;
+    renderShapePuzzle(q);
+    saveAnswer(q.id);
+    renderQuestionNav();
+}
+
+function removePuzzlePiece(slotId) {
+    const q = questions[currentIndex];
+    if (answers[q.id]?.puzzle) {
+        delete answers[q.id].puzzle[slotId];
+    }
+    renderShapePuzzle(q);
+    saveAnswer(q.id);
+    renderQuestionNav();
 }
 
 function selectLikert(val) {
@@ -783,7 +1238,8 @@ function renderQuestionNav() {
             (ans.options && ans.options.length > 0) || 
             ans.text || 
             ans.ordering || 
-            (ans.matching && Object.keys(ans.matching).length > 0)
+            (ans.matching && Object.keys(ans.matching).length > 0) ||
+            (ans.puzzle && Object.keys(ans.puzzle).length > 0)
         );
         if (isAnswered) cnt++;
         const isCur = i === currentIndex;
@@ -861,6 +1317,8 @@ async function saveAnswer(questionId) {
                 text_answer: answer.text || null,
                 ordering: answer.ordering || null,
                 matching: answer.matching || null,
+                puzzle: answer.puzzle || null,
+                time_spent_seconds: questionTimes[questionId] || Math.round((Date.now() - (questionStartTime || Date.now())) / 1000),
             }),
         });
     } catch (err) {
@@ -1007,6 +1465,37 @@ async function logProctoring(eventType) {
 function getFingerprint() {
     return btoa(navigator.userAgent + screen.width + screen.height + new Date().getTimezoneOffset());
 }
+
+// ─── Keyboard Shortcuts ───
+document.addEventListener('keydown', (e) => {
+    // Only active during quiz
+    if (!sessionId || !questions.length) return;
+    // Don't intercept when typing in inputs
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+    const q = questions[currentIndex];
+    const choiceTypes = ['single_choice', 'multiple_choice', 'true_false', 'odd_one_out', 'analogy'];
+
+    switch (e.key) {
+        case 'Enter':
+            e.preventDefault();
+            nextQuestion();
+            break;
+        case 'Escape':
+            e.preventDefault();
+            prevQuestion();
+            break;
+        case '1': case '2': case '3': case '4': case '5': case '6':
+            if (choiceTypes.includes(q?.question_type)) {
+                const idx = parseInt(e.key) - 1;
+                const labels = ['A','B','C','D','E','F'];
+                if (idx < (q.options?.length || 0)) {
+                    selectOption(labels[idx]);
+                }
+            }
+            break;
+    }
+});
 </script>
 
 </body>

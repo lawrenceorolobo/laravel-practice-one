@@ -18,6 +18,7 @@ class TestAnswer extends Model
         'is_correct',
         'points_earned',
         'answered_at',
+        'time_spent_seconds',
     ];
 
     protected function casts(): array
@@ -115,6 +116,19 @@ class TestAnswer extends Model
         } elseif ($type === 'likert_scale') {
             // Likert: always "correct" (opinion-based), award full points
             $isCorrect = ($this->text_answer !== null && $this->text_answer !== '');
+            $pointsEarned = $isCorrect ? $question->points : 0;
+
+        } elseif ($type === 'shape_puzzle') {
+            // Puzzle: text_answer contains JSON of slot→piece mapping
+            $userPuzzle = json_decode($this->text_answer ?? '{}', true) ?: [];
+            $correctOrder = $question->options()
+                ->orderBy('option_order')
+                ->get()
+                ->mapWithKeys(fn($o, $i) => ["slot_$i" => $o->option_text])
+                ->toArray();
+            ksort($userPuzzle);
+            ksort($correctOrder);
+            $isCorrect = $userPuzzle === $correctOrder;
             $pointsEarned = $isCorrect ? $question->points : 0;
 
         } else {

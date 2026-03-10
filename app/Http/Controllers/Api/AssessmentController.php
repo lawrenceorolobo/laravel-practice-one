@@ -23,6 +23,7 @@ class AssessmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $assessments = Assessment::where('user_id', $request->user()->id)
+            ->where('is_template', false)
             ->withCount([
                 'questions',
                 'invitees',
@@ -112,10 +113,15 @@ class AssessmentController extends Controller
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
 
+        // Non-draft assessments can only update scheduling & display fields
+        $schedulableFields = ['start_datetime', 'end_datetime', 'duration_minutes', 'show_result_to_taker'];
         if ($assessment->status !== 'draft') {
-            throw ValidationException::withMessages([
-                'status' => ['Only draft assessments can be edited.'],
-            ]);
+            $hasNonSchedulable = !empty(array_diff(array_keys($request->except(['_method', '_token'])), $schedulableFields));
+            if ($hasNonSchedulable) {
+                throw ValidationException::withMessages([
+                    'status' => ['Only scheduling fields (dates, duration) can be edited on published assessments.'],
+                ]);
+            }
         }
 
         $validated = $request->validate([
@@ -131,7 +137,7 @@ class AssessmentController extends Controller
             'webcam_required' => ['boolean'],
             'fullscreen_required' => ['boolean'],
             'start_datetime' => ['sometimes', 'date'],
-            'end_datetime' => ['sometimes', 'date', 'after:start_datetime'],
+            'end_datetime' => ['nullable', 'date'],
         ]);
 
         // Override proctoring fields if feature flags are disabled
@@ -224,6 +230,43 @@ class AssessmentController extends Controller
             'assessment' => $assessment->fresh(),
             'invitations_queued' => $assessment->invitees_count,
         ]);
+    }
+
+    /**
+     * Duplicate assessment with all questions
+     */
+    public function duplicate(Request $request, string $id): JsonResponse
+    {
+        $original = Assessment::where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->with(['questions.options'])
+            ->firstOrFail();
+
+        $newAssessment = $original->replicate(['status', 'access_code', 'total_questions']);
+        $newAssessment->title = $original->title . ' (Copy)';
+        $newAssessment->status = 'draft';
+        $newAssessment->access_code = null;
+        $newAssessment->save();
+
+        // Clone questions with options
+        foreach ($original->questions as $question) {
+            $newQ = $question->replicate(['assessment_id']);
+            $newQ->assessment_id = $newAssessment->id;
+            $newQ->save();
+
+            foreach ($question->options as $option) {
+                $newOpt = $option->replicate(['question_id']);
+                $newOpt->question_id = $newQ->id;
+                $newOpt->save();
+            }
+        }
+
+        broadcast(new AssessmentUpdated($request->user()->id, 'created'))->toOthers();
+
+        return response()->json([
+            'message' => 'Assessment duplicated successfully.',
+            'assessment' => $newAssessment->load('questions.options'),
+        ], 201);
     }
 
     /**
@@ -398,6 +441,7 @@ class AssessmentController extends Controller
                 'time_spent' => $session->time_spent_seconds,
                 'tab_switches' => $session->tab_switches,
                 'fullscreen_exits' => $session->fullscreen_exits,
+                'webcam_recording_url' => $session->webcam_recording_url,
             ],
             'answers' => $formattedAnswers,
             'total_questions' => count($formattedAnswers),
@@ -426,5 +470,150 @@ class AssessmentController extends Controller
             ['label' => '61-80', 'value' => (int) ($r->r_61_80 ?? 0)],
             ['label' => '81-100', 'value' => (int) ($r->r_81_100 ?? 0)],
         ];
+    }
+
+    /**
+     * List all system templates
+     */
+    public function templates(Request $request): JsonResponse
+    {
+        $templates = Assessment::where('is_template', true)
+            ->withCount('questions')
+            ->with('questions:id,assessment_id,question_type')
+            ->get()
+            ->map(function ($t) {
+                $types = $t->questions->pluck('question_type')->unique()->values();
+                return [
+                    'id' => $t->id,
+                    'title' => $t->title,
+                    'description' => $t->description,
+                    'duration_minutes' => $t->duration_minutes,
+                    'pass_percentage' => $t->pass_percentage,
+                    'questions_count' => $t->questions_count,
+                    'question_types' => $types,
+                ];
+            });
+
+        return response()->json(['templates' => $templates]);
+    }
+
+    /**
+     * Clone a template into user's assessments
+     */
+    public function cloneTemplate(Request $request, string $id): JsonResponse
+    {
+        $template = Assessment::where('id', $id)
+            ->where('is_template', true)
+            ->with(['questions.options'])
+            ->firstOrFail();
+
+        $newAssessment = $template->replicate([
+            'status', 'access_code', 'total_questions', 'is_template',
+            'start_datetime', 'end_datetime', 'total_invites',
+        ]);
+        $newAssessment->user_id = $request->user()->id;
+        $newAssessment->title = $template->title;
+        $newAssessment->status = 'draft';
+        $newAssessment->is_template = false;
+        $newAssessment->access_code = null;
+        $newAssessment->start_datetime = now()->addHour();
+        $newAssessment->end_datetime = now()->addWeek();
+        $newAssessment->save();
+
+        foreach ($template->questions as $question) {
+            $newQ = $question->replicate(['assessment_id']);
+            $newQ->assessment_id = $newAssessment->id;
+            $newQ->save();
+
+            foreach ($question->options as $option) {
+                $newOpt = $option->replicate(['question_id']);
+                $newOpt->question_id = $newQ->id;
+                $newOpt->save();
+            }
+        }
+
+        $newAssessment->update(['total_questions' => $newAssessment->questions()->count()]);
+
+        return response()->json([
+            'message' => 'Template cloned successfully.',
+            'assessment' => $newAssessment->load('questions.options'),
+        ], 201);
+    }
+
+    /**
+     * Get questions from a template
+     */
+    public function templateQuestions(Request $request, string $id): JsonResponse
+    {
+        $template = Assessment::where('id', $id)
+            ->where('is_template', true)
+            ->with('questions.options')
+            ->firstOrFail();
+
+        return response()->json([
+            'template' => [
+                'id' => $template->id,
+                'title' => $template->title,
+            ],
+            'questions' => $template->questions->map(fn($q) => [
+                'id' => $q->id,
+                'question_text' => $q->question_text,
+                'question_type' => $q->question_type,
+                'points' => $q->points,
+                'expected_answer' => $q->expected_answer,
+                'question_metadata' => $q->question_metadata,
+                'options' => $q->options->map(fn($o) => [
+                    'option_text' => $o->option_text,
+                    'option_label' => $o->option_label,
+                    'is_correct' => $o->is_correct,
+                    'option_order' => $o->option_order,
+                    'media_url' => $o->media_url,
+                    'media_type' => $o->media_type,
+                ]),
+            ]),
+        ]);
+    }
+
+    /**
+     * Import selected questions from a template into an assessment
+     */
+    public function importFromTemplate(Request $request, string $assessmentId): JsonResponse
+    {
+        $assessment = Assessment::where('id', $assessmentId)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'question_ids' => ['required', 'array', 'min:1'],
+            'question_ids.*' => ['string'],
+        ]);
+
+        $sourceQuestions = Question::whereIn('id', $validated['question_ids'])
+            ->with('options')
+            ->get();
+
+        $maxOrder = $assessment->questions()->max('question_order') ?? 0;
+        $imported = 0;
+
+        foreach ($sourceQuestions as $q) {
+            $newQ = $q->replicate(['assessment_id', 'question_order']);
+            $newQ->assessment_id = $assessment->id;
+            $newQ->question_order = ++$maxOrder;
+            $newQ->save();
+
+            foreach ($q->options as $opt) {
+                $newOpt = $opt->replicate(['question_id']);
+                $newOpt->question_id = $newQ->id;
+                $newOpt->save();
+            }
+            $imported++;
+        }
+
+        $assessment->update(['total_questions' => $assessment->questions()->count()]);
+
+        return response()->json([
+            'message' => "Imported {$imported} question(s) successfully.",
+            'total_questions' => $assessment->total_questions,
+        ]);
     }
 }

@@ -158,7 +158,7 @@ else {
     
     // Check subscription status from server (localStorage may be stale after payment)
     fetch('/api/auth/profile', { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } })
-        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(r => r.ok ? r.json() : r.json().then(d => Promise.reject(d)))
         .then(data => {
             const u = data.user || data;
             localStorage.setItem('user', JSON.stringify(u));
@@ -166,12 +166,38 @@ else {
                 window.location.href = '/select-plan';
             }
         })
-        .catch(() => { /* token invalid = logout handled elsewhere */ });
+        .catch(err => {
+            if (err?.code === 'account_deactivated') {
+                localStorage.removeItem('token'); localStorage.removeItem('user');
+                window.location.href = '/login?deactivated=1';
+            }
+        });
 }
 async function logout() {
     try { await fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } }); } catch(e){}
     localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login';
 }
+
+// Global 403 interceptor — auto-logout deactivated users on ANY API call
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const response = await originalFetch.apply(this, args);
+        if (response.status === 403) {
+            try {
+                const clone = response.clone();
+                const body = await clone.json();
+                if (body?.code === 'account_deactivated') {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login?deactivated=1';
+                    return response;
+                }
+            } catch(e) {}
+        }
+        return response;
+    };
+})();
 function openMobileMenu() {
     document.getElementById('mobileOverlay').classList.remove('hidden');
     document.getElementById('mobileDrawer').classList.remove('-translate-x-full');
