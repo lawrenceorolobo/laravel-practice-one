@@ -56,6 +56,7 @@ class AssessmentController extends Controller
             'proctoring_enabled' => ['boolean'],
             'webcam_required' => ['boolean'],
             'fullscreen_required' => ['boolean'],
+            'auto_end_on_leave' => ['boolean'],
             'start_datetime' => ['required', 'date'],
             'end_datetime' => ['required', 'date', 'after:start_datetime'],
         ]);
@@ -64,6 +65,7 @@ class AssessmentController extends Controller
         if (!feature('proctoring_enabled')) {
             $validated['proctoring_enabled'] = false;
             $validated['fullscreen_required'] = false;
+            $validated['auto_end_on_leave'] = false;
         }
         if (!feature('webcam_recording')) {
             $validated['webcam_required'] = false;
@@ -136,6 +138,7 @@ class AssessmentController extends Controller
             'proctoring_enabled' => ['boolean'],
             'webcam_required' => ['boolean'],
             'fullscreen_required' => ['boolean'],
+            'auto_end_on_leave' => ['boolean'],
             'start_datetime' => ['sometimes', 'date'],
             'end_datetime' => ['nullable', 'date'],
         ]);
@@ -144,6 +147,7 @@ class AssessmentController extends Controller
         if (!feature('proctoring_enabled')) {
             $validated['proctoring_enabled'] = false;
             $validated['fullscreen_required'] = false;
+            $validated['auto_end_on_leave'] = false;
         }
         if (!feature('webcam_recording')) {
             $validated['webcam_required'] = false;
@@ -436,11 +440,15 @@ class AssessmentController extends Controller
                 'id' => $session->id,
                 'candidate' => trim(($session->first_name ?? '') . ' ' . ($session->last_name ?? '')),
                 'email' => $session->email,
-                'score' => (float) $session->percentage,
+                'percentage' => $session->percentage !== null ? (float) $session->percentage : null,
+                'total_score' => (float) $session->total_score,
+                'max_score' => (float) $session->max_score,
                 'passed' => (bool) $session->passed,
-                'time_spent' => $session->time_spent_seconds,
+                'time_spent_seconds' => $session->time_spent_seconds,
                 'tab_switches' => $session->tab_switches,
                 'fullscreen_exits' => $session->fullscreen_exits,
+                'ip_address' => $session->ip_address,
+                'user_agent' => $session->user_agent,
                 'webcam_recording_url' => $session->webcam_recording_url,
             ],
             'answers' => $formattedAnswers,

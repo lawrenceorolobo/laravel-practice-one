@@ -469,29 +469,27 @@ class InviteeController extends Controller
     {
         $assessment = $this->getOwnedAssessment($request, $assessmentId);
 
-        // Get all emails already invited to this assessment
-        $existingEmails = $assessment->invitees()
-            ->pluck('email')
-            ->map(fn($e) => strtolower($e))
-            ->toArray();
+        // All emails already on this assessment (exclude from suggestions)
+        $existingEmails = $assessment->invitees()->pluck(DB::raw('LOWER(email)'))->toArray();
 
-        // Get unique candidates from other assessments by this user
-        $otherAssessmentIds = Assessment::where('user_id', $request->user()->id)
-            ->where('id', '!=', $assessmentId)
-            ->pluck('id');
-
-        $candidates = Invitee::whereIn('assessment_id', $otherAssessmentIds)
-            ->select('email', 'first_name', 'last_name', 'assessment_id')
+        // Unique candidates from user's OTHER assessments — dedup by email at DB level
+        $candidates = Invitee::select(DB::raw('MIN(id) as id'), 'email', 'first_name', 'last_name',
+                DB::raw('MAX(assessment_id) as assessment_id'))
+            ->whereIn('assessment_id',
+                Assessment::where('user_id', $request->user()->id)
+                    ->where('id', '!=', $assessmentId)
+                    ->select('id')
+            )
+            ->whereNotIn(DB::raw('LOWER(email)'), $existingEmails)
+            ->groupBy('email', 'first_name', 'last_name')
+            ->orderByDesc(DB::raw('MAX(created_at)'))
+            ->limit(200)
             ->with('assessment:id,title')
-            ->orderBy('created_at', 'desc')
             ->get()
-            ->filter(fn($inv) => !in_array(strtolower($inv->email), $existingEmails))
-            ->unique('email')
-            ->values()
             ->map(fn($inv) => [
-                'email' => $inv->email,
-                'first_name' => $inv->first_name,
-                'last_name' => $inv->last_name,
+                'email'           => $inv->email,
+                'first_name'      => $inv->first_name,
+                'last_name'       => $inv->last_name,
                 'from_assessment' => $inv->assessment?->title ?? 'Unknown',
             ]);
 
@@ -526,9 +524,13 @@ class InviteeController extends Controller
             $query->where('status', $status);
         }
 
-        $candidates = $query->orderByDesc('created_at')->get();
+        $candidates = $query->orderByDesc('created_at')->paginate(100);
 
-        return response()->json(['data' => $candidates]);
+        return response()->json(['data' => $candidates->items(), 'meta' => [
+            'current_page' => $candidates->currentPage(),
+            'last_page' => $candidates->lastPage(),
+            'total' => $candidates->total(),
+        ]]);
     }
 
     protected function getOwnedAssessment(Request $request, string $assessmentId): Assessment

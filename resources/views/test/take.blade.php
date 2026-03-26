@@ -50,6 +50,52 @@
                     </div>
                 </div>
 
+                <!-- Google Meet Style Hardware Check -->
+                <div id="hardwareCheckSection" class="hidden mb-6">
+                    <p class="text-sm font-semibold text-slate-900 mb-2">Hardware Setup</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <!-- Camera Check -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900 leading-tight">Camera</p>
+                                    <p id="cameraStatusText" class="text-xs text-slate-500">Unverified</p>
+                                </div>
+                            </div>
+                            <button type="button" id="btnAllowCamera" onclick="runCameraCheck()" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded text-xs font-bold transition">Allow</button>
+                        </div>
+                        
+                        <!-- Mic Check -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900 leading-tight">Microphone</p>
+                                    <p id="micStatusText" class="text-xs text-slate-500">Unverified</p>
+                                </div>
+                            </div>
+                            <button type="button" id="btnAllowMic" onclick="runMicCheck()" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded text-xs font-bold transition">Allow</button>
+                        </div>
+                    </div>
+                    
+                    <div id="hardwarePreviewContainer" class="relative rounded-xl overflow-hidden bg-slate-900 w-full aspect-video flex flex-col items-center justify-center shadow-inner border-2 border-slate-800">
+                        <!-- Default state -->
+                        <div id="hardwarePreState" class="text-center p-6 z-10 w-full h-full flex flex-col items-center justify-center bg-slate-800/80 backdrop-blur-sm">
+                            <p class="text-white/80 text-sm font-medium">Please allow both your camera and microphone above to continue.</p>
+                        </div>
+                        <!-- Video output -->
+                        <video id="hardwarePreviewVideo" autoplay muted playsinline class="absolute inset-0 w-full h-full object-cover transform scale-x-[-1] hidden"></video>
+                    </div>
+                    
+                    <div id="hardwareCheckResult" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 font-medium flex items-center gap-2 mt-3"></div>
+                </div>
+
                 <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
                     <strong>Important:</strong> This test will monitor tab switching and fullscreen exits. Do not switch tabs or exit fullscreen during the assessment.
                 </div>
@@ -220,8 +266,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
             </div>
-            <h2 class="text-2xl font-bold text-slate-900 mb-2">Assessment Completed!</h2>
-            <p class="text-slate-600 mb-6">Your responses have been submitted successfully.</p>
+            <h2 id="completedTitle" class="text-2xl font-bold text-slate-900 mb-2">Assessment Completed!</h2>
+            <p id="completedMessage" class="text-slate-600 mb-6">Your responses have been submitted successfully.</p>
             
             <div id="scoreCard" class="hidden bg-indigo-50 rounded-lg p-6 mb-6">
                 <p class="text-slate-600">Your Score</p>
@@ -278,6 +324,17 @@
 </div>
 
 <script>
+// Simple robust fingerprint fallback
+function getFingerprint() {
+    try {
+        const sr = window.screen;
+        const fp = navigator.userAgent + '|' + (sr ? sr.width + 'x' + sr.height : 'unknown') + '|' + navigator.language + '|' + new Date().getTimezoneOffset();
+        return fp.substring(0, 250);
+    } catch(e) {
+        return 'unknown-fingerprint-' + Math.random().toString(36).substring(7);
+    }
+}
+
 const TOKEN = '{{ $token ?? "" }}';
 let sessionId = null;
 let assessmentData = null;
@@ -294,6 +351,10 @@ let webcamStream = null;
 let mediaRecorder = null;
 let recordedChunks = [];
 let isSubmitting = false;
+let hardwarePassed = false;
+let hardwareStreamVideo = null;
+let hardwareStreamAudio = null;
+let hardwarePreviewStream = null;
 let questionStartTime = null; // Per-question timer
 let questionTimes = {}; // Accumulated time per question ID
 
@@ -380,6 +441,19 @@ document.addEventListener('visibilitychange', () => {
             isSubmitting = true;
             clearInterval(timerInterval);
             if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); }
+            stopAndUploadRecording(); // Trigger background upload of evidence
+            
+            // Show terminated state on the frontend if they stay on the page
+            hideAll();
+            document.getElementById('completedState').classList.remove('hidden');
+            document.getElementById('scoreCard').classList.add('hidden');
+            const titleEl = document.getElementById('completedTitle');
+            if (titleEl) titleEl.textContent = 'Assessment Terminated';
+            const msgEl = document.getElementById('completedMessage');
+            if (msgEl) msgEl.textContent = 'Your assessment was automatically submitted because you left the active window.';
+            
+            // Exit fullscreen
+            if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
         }
     }
 });
@@ -389,12 +463,29 @@ window.addEventListener('beforeunload', (e) => {
     if (sessionId && autoEndOnLeave && !isSubmitting) {
         navigator.sendBeacon(`/api/test/submit/${TOKEN}`);
         isSubmitting = true;
+        stopAndUploadRecording(); // Trigger background upload of evidence
     }
 });
 
 document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement && sessionId) {
+    if (!document.fullscreenElement && sessionId && !isSubmitting) {
         logProctoring('fullscreen_exit');
+        if (autoEndOnLeave) {
+            const url = `/api/test/submit/${TOKEN}`;
+            navigator.sendBeacon(url);
+            isSubmitting = true;
+            clearInterval(timerInterval);
+            if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); }
+            stopAndUploadRecording(); // Trigger background upload of evidence
+            
+            hideAll();
+            document.getElementById('completedState').classList.remove('hidden');
+            document.getElementById('scoreCard').classList.add('hidden');
+            const titleEl = document.getElementById('completedTitle');
+            if (titleEl) titleEl.textContent = 'Assessment Terminated';
+            const msgEl = document.getElementById('completedMessage');
+            if (msgEl) msgEl.textContent = 'Your assessment was automatically submitted because you exited fullscreen mode.';
+        }
     }
 });
 
@@ -443,6 +534,14 @@ function showRegistration(assessment, data) {
         lnInput.readOnly = true;
         lnInput.classList.add('bg-slate-100', 'cursor-not-allowed');
     }
+    
+    webcamRequired = assessment?.webcam_required || false;
+    if (webcamRequired) {
+        document.getElementById('hardwareCheckSection').classList.remove('hidden');
+    } else {
+        document.getElementById('hardwareCheckSection').classList.add('hidden');
+    }
+    
     checkStartForm();
 }
 
@@ -469,9 +568,22 @@ function showQuiz(assessment) {
 
 async function startWebcam() {
     try {
-        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        if (!hardwarePreviewStream && hardwareStreamVideo && hardwareStreamAudio) {
+            hardwarePreviewStream = new MediaStream([...hardwareStreamVideo.getTracks(), ...hardwareStreamAudio.getTracks()]);
+        }
+        
+        if (!hardwarePreviewStream) {
+            const vStream = await navigator.mediaDevices.getUserMedia({ video: true }).catch(e => { throw {type: 'video', err: e}; });
+            const aStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(e => { throw {type: 'audio', err: e}; });
+            hardwarePreviewStream = new MediaStream([...vStream.getTracks(), ...aStream.getTracks()]);
+        }
+        
+        webcamStream = hardwarePreviewStream; // Feed the validated hardware stream to the recording pipeline
+
         const video = document.getElementById('webcamVideo');
         video.srcObject = webcamStream;
+        video.muted = true; // required for autoplay policy
+        video.play().catch(() => {}); // explicit play() for Safari/Chrome autoplay policy
         document.getElementById('webcamOverlay').classList.remove('hidden');
 
         // Start recording if Cloudinary is configured
@@ -497,9 +609,9 @@ async function startWebcam() {
                 console.warn('MediaRecorder not available:', recErr);
             }
         }
-    } catch (err) {
+    } catch (errObj) {
         if (webcamRequired) {
-            toastError('Webcam access is required for this assessment. Please enable your camera and refresh.');
+            toastError('Webcam/Mic access is required for this assessment. Please check permissions and refresh.');
         }
     }
 }
@@ -518,25 +630,161 @@ function hideAll() {
     document.getElementById('errorState').classList.add('hidden');
 }
 
-// Progressive form validation — enable Start button only when both names filled
+// Progressive form validation — enable Start button only when both names filled (and hardware check if required)
 function checkStartForm() {
     const fn = document.getElementById('firstName').value.trim();
     const ln = document.getElementById('lastName').value.trim();
-    document.getElementById('startBtn').disabled = !(fn && ln);
+    let canStart = fn && ln;
+    if (webcamRequired && (!hardwareStreamVideo || !hardwareStreamAudio)) {
+        canStart = false;
+    }
+    document.getElementById('startBtn').disabled = !canStart;
 }
 document.getElementById('firstName').addEventListener('input', checkStartForm);
 document.getElementById('lastName').addEventListener('input', checkStartForm);
 
+async function runCameraCheck() {
+    const btn = document.getElementById('btnAllowCamera');
+    const result = document.getElementById('hardwareCheckResult');
+    btn.disabled = true;
+    btn.textContent = '...';
+    result.classList.add('hidden');
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        hardwareStreamVideo = stream;
+        
+        btn.classList.add('hidden');
+        document.getElementById('cameraStatusText').textContent = 'Connected';
+        document.getElementById('cameraStatusText').classList.replace('text-slate-500', 'text-emerald-500');
+        
+        const previewVideo = document.getElementById('hardwarePreviewVideo');
+        // Do not overwrite srcObject if it exists from mic, just add tracks (though mic usually doesn't set srcObject)
+        if (!previewVideo.srcObject) {
+            previewVideo.srcObject = stream;
+        } else {
+            stream.getVideoTracks().forEach(t => previewVideo.srcObject.addTrack(t));
+        }
+        previewVideo.classList.remove('hidden');
+        
+        setupTrackListener(stream.getVideoTracks()[0], 'Camera');
+        checkStartForm();
+    } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Allow';
+        showHardwareError('Camera', err);
+    }
+}
+
+async function runMicCheck() {
+    const btn = document.getElementById('btnAllowMic');
+    const result = document.getElementById('hardwareCheckResult');
+    btn.disabled = true;
+    btn.textContent = '...';
+    result.classList.add('hidden');
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        hardwareStreamAudio = stream;
+        
+        btn.classList.add('hidden');
+        document.getElementById('micStatusText').textContent = 'Connected';
+        document.getElementById('micStatusText').classList.replace('text-slate-500', 'text-emerald-500');
+        
+        setupTrackListener(stream.getAudioTracks()[0], 'Microphone');
+        checkStartForm();
+    } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Allow';
+        showHardwareError('Microphone', err);
+    }
+}
+
+function showHardwareError(type, err) {
+    const result = document.getElementById('hardwareCheckResult');
+    let errMsg = `Access Denied: Please allow permissions (${err.name}).`;
+    if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errMsg = `No ${type} found. Please connect one.`;
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errMsg = `${type} is currently in use by another app (e.g. Zoom/Google Meet) or blocked by an Antivirus.`;
+    } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errMsg = `Your ${type} is blocked by Windows Privacy Settings or your Antivirus.`;
+    } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errMsg = `Constraints not satisfied for ${type}.`;
+    } else {
+        errMsg = `${type} Error: ${err.message || err.name}`;
+    }
+    result.classList.remove('hidden');
+    result.innerHTML = `<svg class="w-5 h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> <span class="leading-tight text-red-700">${errMsg}</span>`;
+}
+
+function setupTrackListener(track, type) {
+    track.onended = () => {
+        if (!isSubmitting && document.getElementById('quizState').classList.contains('hidden')) {
+            // Revoked during registration
+            document.getElementById('hardwareCheckResult').classList.remove('hidden');
+            document.getElementById('hardwareCheckResult').innerHTML = `<svg class="w-5 h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> <span class="leading-tight text-red-700">${type} Access Revoked or Disconnected! You must allow access again.</span>`;
+            
+            if (type === 'Camera') {
+                hardwareStreamVideo = null;
+                document.getElementById('btnAllowCamera').classList.remove('hidden');
+                document.getElementById('btnAllowCamera').disabled = false;
+                document.getElementById('btnAllowCamera').textContent = 'Allow';
+                document.getElementById('cameraStatusText').textContent = 'Unverified';
+                document.getElementById('cameraStatusText').classList.replace('text-emerald-500', 'text-slate-500');
+                document.getElementById('hardwarePreviewVideo').classList.add('hidden');
+            } else {
+                hardwareStreamAudio = null;
+                document.getElementById('btnAllowMic').classList.remove('hidden');
+                document.getElementById('btnAllowMic').disabled = false;
+                document.getElementById('btnAllowMic').textContent = 'Allow';
+                document.getElementById('micStatusText').textContent = 'Unverified';
+                document.getElementById('micStatusText').classList.replace('text-emerald-500', 'text-slate-500');
+            }
+            checkStartForm();
+        } else if (!isSubmitting) {
+            // Mid-test hardware disconnect/revoke
+            logProctoring('hardware_disconnected');
+            if (autoEndOnLeave) {
+                const url = `/api/test/submit/${TOKEN}`;
+                navigator.sendBeacon(url);
+                isSubmitting = true;
+                clearInterval(timerInterval);
+                stopAndUploadRecording(); // Trigger background upload of evidence
+                
+                hideAll();
+                document.getElementById('completedState').classList.remove('hidden');
+                document.getElementById('scoreCard').classList.add('hidden');
+                const titleEl = document.getElementById('completedTitle');
+                if (titleEl) titleEl.textContent = 'Assessment Terminated';
+                const msgEl = document.getElementById('completedMessage');
+                if (msgEl) msgEl.textContent = `Your assessment was automatically submitted because your ${type} was disconnected or blocked mid-test.`;
+            }
+        }
+    };
+    
+    // Check if both are now connected to hide pre-state
+    if (hardwareStreamVideo && hardwareStreamAudio) {
+        document.getElementById('hardwarePreState').classList.add('hidden');
+    }
+}
+
 // Start form
 document.getElementById('startForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    // Do NOT stop the hardwarePreviewStream here! We will hand it directly to the quiz recording.
+    // This prevents "NotReadableError" if the device doesn't release quickly enough.
+    
     const errorDiv = document.getElementById('regError');
     errorDiv.classList.add('hidden');
     
     try {
         const res = await fetch(`/api/test/start/${TOKEN}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({
                 first_name: document.getElementById('firstName').value,
                 last_name: document.getElementById('lastName').value,
@@ -556,14 +804,17 @@ document.getElementById('startForm')?.addEventListener('submit', async (e) => {
         await loadQuestions();
         showQuiz(assessmentData);
     } catch (err) {
-        errorDiv.textContent = 'Network error.';
+        errorDiv.textContent = 'Network error: ' + (err.message || 'Unknown error');
         errorDiv.classList.remove('hidden');
+        console.error('Start Assessment Error:', err);
     }
 });
 
 async function loadQuestions() {
     try {
-        const res = await fetch(`/api/test/questions/${TOKEN}`);
+        const res = await fetch(`/api/test/questions/${TOKEN}`, {
+            headers: { 'Accept': 'application/json' }
+        });
         const data = await res.json();
         
         if (!res.ok) {
@@ -1350,9 +1601,9 @@ async function submitTest() {
     if (!confirmed) return;
     
     try {
-        // Stop webcam recording and upload
+        // Stop webcam recording and trigger background upload
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            await stopAndUploadRecording();
+            stopAndUploadRecording();
         }
 
         const res = await fetch(`/api/test/submit/${TOKEN}`, {method: 'POST'});
@@ -1379,56 +1630,76 @@ async function submitTest() {
 }
 
 function stopWebcam() {
+    // Stop the main recording stream
     if (webcamStream) {
         webcamStream.getTracks().forEach(t => t.stop());
         webcamStream = null;
     }
+    // Stop hardware check streams (camera light must turn off)
+    if (hardwareStreamVideo) {
+        hardwareStreamVideo.getTracks().forEach(t => t.stop());
+        hardwareStreamVideo = null;
+    }
+    if (hardwareStreamAudio) {
+        hardwareStreamAudio.getTracks().forEach(t => t.stop());
+        hardwareStreamAudio = null;
+    }
+    if (hardwarePreviewStream) {
+        hardwarePreviewStream.getTracks().forEach(t => t.stop());
+        hardwarePreviewStream = null;
+    }
+    // Clear the UI video elements
+    const wv = document.getElementById('webcamVideo');
+    if (wv) { wv.srcObject = null; }
+    const hv = document.getElementById('hardwarePreviewVideo');
+    if (hv) { hv.srcObject = null; }
+    document.getElementById('webcamOverlay')?.classList.add('hidden');
 }
 
-async function stopAndUploadRecording() {
-    return new Promise((resolve) => {
-        mediaRecorder.onstop = async () => {
-            if (recordedChunks.length === 0) { resolve(); return; }
+function stopAndUploadRecording() {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
 
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-            recordedChunks = [];
+    mediaRecorder.onstop = async () => {
+        if (recordedChunks.length === 0) return;
 
-            try {
-                toastInfo('Uploading proctoring recording...');
-                const formData = new FormData();
-                formData.append('file', blob, `proctoring_${sessionId}.webm`);
-                formData.append('upload_preset', CLOUDINARY_PRESET);
-                formData.append('folder', 'quizly/proctoring');
-                formData.append('resource_type', 'video');
+        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+        recordedChunks = [];
 
-                const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`, {
+        try {
+            // Upload quietly in the background
+            const formData = new FormData();
+            formData.append('file', blob, `proctoring_${sessionId}.webm`);
+            formData.append('upload_preset', CLOUDINARY_PRESET);
+            formData.append('folder', 'quizly/proctoring');
+            formData.append('resource_type', 'video');
+
+            const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                // Save to backend using keepalive so it works even if navigating away
+                await fetch(`/api/test/recording/${TOKEN}`, {
                     method: 'POST',
-                    body: formData,
+                    headers: { 'Content-Type': 'application/json' },
+                    keepalive: true,
+                    body: JSON.stringify({
+                        recording_url: uploadData.secure_url,
+                        recording_id: uploadData.public_id,
+                    }),
                 });
-
-                if (uploadRes.ok) {
-                    const uploadData = await uploadRes.json();
-                    // Save to backend
-                    await fetch(`/api/test/recording/${TOKEN}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            recording_url: uploadData.secure_url,
-                            recording_id: uploadData.public_id,
-                        }),
-                    });
-                    console.log('Recording uploaded:', uploadData.secure_url);
-                } else {
-                    console.error('Cloudinary upload failed');
-                }
-            } catch (err) {
-                console.error('Recording upload error:', err);
+                console.log('Recording uploaded:', uploadData.secure_url);
+            } else {
+                console.error('Cloudinary upload failed');
             }
-            resolve();
-        };
+        } catch (err) {
+            console.error('Recording upload error:', err);
+        }
+    };
 
-        mediaRecorder.stop();
-    });
+    mediaRecorder.stop();
 }
 
 function startTimer() {

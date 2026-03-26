@@ -499,6 +499,21 @@
 </div>
 </div>
 
+<!-- Answers Modal -->
+<div id="answersModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onclick="if(event.target===this)closeAnswersModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-6 border-b shrink-0">
+            <h2 class="text-xl font-bold">Candidate Answers</h2>
+            <div id="answersModalActions" class="ml-auto mr-4 flex gap-2"></div>
+            <button onclick="closeAnswersModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+        </div>
+        <div id="answersModalBody" class="p-6 overflow-y-auto flex-1 space-y-4">
+            <p class="text-center text-slate-500 py-8">Loading answers...</p>
+        </div>
+    </div>
+</div>
+
+
 <!-- Question Bank Modal -->
 <div id="questionBankModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
     <div class="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl h-[85vh] sm:h-auto sm:max-h-[85vh] flex flex-col">
@@ -1389,6 +1404,86 @@ async function addReuseCandidates() {
         btn.disabled = false;
         btn.textContent = 'Add Selected Candidates';
     }
+}
+
+// Progressive form validation
+function checkInviteForm() {
+    const email = document.querySelector('#inviteForm [name="email"]').value.trim();
+    document.getElementById('addCandidateBtn').disabled = !email || !/\S+@\S+\.\S+/.test(email);
+}
+function checkQuestionForm() {
+    const text = document.querySelector('#questionForm [name="text"]').value.trim();
+    document.getElementById('saveQuestionBtn').disabled = !text;
+}
+
+// Answers Modal Viewer
+async function viewAnswers(sessionId) {
+    document.getElementById('answersModal').classList.remove('hidden');
+    document.getElementById('answersModalBody').innerHTML = '<p class="text-center text-slate-500 py-8">Loading answers...</p>';
+    document.getElementById('answersModalActions').innerHTML = '';
+    
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/sessions/${sessionId}/answers`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        
+        // Add Play Recording button if available
+        if (data.session && data.session.webcam_recording_url) {
+            document.getElementById('answersModalActions').innerHTML = `<button onclick="window.open('${data.session.webcam_recording_url}', '_blank')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Play Video Recording</button>`;
+        }
+        
+        const html = data.answers.map((a, i) => {
+            const correctStyle = a.is_correct ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-200 bg-red-50/50';
+            const icon = a.is_correct ? '<span class="text-emerald-500 font-bold">✓</span>' : '<span class="text-red-500 font-bold">✗</span>';
+            
+            let answerDisplay = '';
+            if (['text_input', 'fill_blank', 'numeric'].includes(a.question_type)) {
+                answerDisplay = `<p class="text-sm mt-2"><b>Candidate:</b> ${a.text_answer || '<em class="text-slate-400">Blank</em>'}</p>
+                                 <p class="text-sm text-slate-500 mt-1"><b>Expected:</b> ${a.expected_answer || 'N/A'}</p>`;
+            } else if (['ordering', 'drag_drop_sort', 'matching'].includes(a.question_type)) {
+                answerDisplay = `<p class="text-sm mt-2"><b>Candidate:</b> ${a.text_answer || JSON.stringify(a.selected_options) || '<em class="text-slate-400">Blank</em>'}</p>`;
+            } else {
+                // Choice types
+                answerDisplay = `<div class="mt-3 space-y-1">
+                    ${a.options.map((opt, oIdx) => {
+                        const isSelected = (a.selected_options || []).includes(oIdx.toString());
+                        const isExpected = opt.is_correct;
+                        let style = 'text-slate-600';
+                        let prefix = '<span class="text-slate-300 w-4 inline-block text-center rounded-full text-[10px] border mr-1">○</span>';
+                        if (isSelected && isExpected) { style = 'text-emerald-700 font-medium'; prefix = '<span class="text-emerald-600 w-4 inline-block text-center rounded-full text-[10px] border border-emerald-500 bg-emerald-50 mr-1">✓</span>'; }
+                        else if (isSelected && !isExpected) { style = 'text-red-600'; prefix = '<span class="text-red-500 w-4 inline-block text-center rounded-full text-[10px] border border-red-500 bg-red-50 mr-1">✗</span>'; }
+                        else if (!isSelected && isExpected) { style = 'text-emerald-600 font-medium'; prefix = '<span class="text-emerald-500 w-4 inline-block text-center rounded-full text-[10px] border border-emerald-500 border-dashed mr-1">✓</span>'; }
+                        return `<p class="text-sm ${style}">${prefix} ${opt.text}</p>`;
+                    }).join('')}
+                </div>`;
+            }
+            
+            return `
+            <div class="border rounded-xl p-4 ${correctStyle}">
+                <div class="flex gap-3">
+                    <span class="font-bold text-slate-700 border-r pr-3">${i + 1}.</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-slate-900 break-words">${a.question_text}</p>
+                        ${answerDisplay}
+                    </div>
+                    <div class="text-right shrink-0">
+                        ${icon}
+                        <p class="text-xs text-slate-500 mt-1 shadow-sm px-2 py-0.5 rounded-full bg-white">${a.points_earned} / ${a.max_points}</p>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        
+        document.getElementById('answersModalBody').innerHTML = html || '<p class="text-center text-slate-500 py-8">No answers found</p>';
+    } catch (e) {
+        document.getElementById('answersModalBody').innerHTML = '<p class="text-center text-red-500 py-8">Failed to load answers.</p>';
+    }
+}
+
+function closeAnswersModal() {
+    document.getElementById('answersModal').classList.add('hidden');
 }
 
 // Progressive form validation

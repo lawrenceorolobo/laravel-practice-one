@@ -435,7 +435,7 @@ class TestController extends Controller
         }
 
         $validated = $request->validate([
-            'event_type' => ['required', 'in:tab_switch,fullscreen_exit'],
+            'event_type' => ['required', 'in:tab_switch,fullscreen_exit,hardware_disconnected'],
         ]);
 
         $invitee = Invitee::where('invite_token', $token)
@@ -587,8 +587,10 @@ class TestController extends Controller
         }
 
         $invitee = Invitee::where('invite_token', $token)->firstOrFail();
+        
+        // Accept both in_progress and submitted/timed_out — recording may arrive slightly after submission
         $session = TestSession::where('invitee_id', $invitee->id)
-            ->where('status', 'in_progress')
+            ->whereIn('status', ['in_progress', 'submitted', 'timed_out'])
             ->latest()
             ->firstOrFail();
 

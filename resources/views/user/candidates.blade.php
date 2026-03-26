@@ -95,6 +95,22 @@
         <div id="candidateCompareBody" class="p-6 overflow-y-auto flex-1"></div>
     </div>
 </div>
+
+<!-- Session Detail Modal -->
+<div id="sessionDetailModal" class="hidden fixed inset-0 z-[60] items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onclick="if(event.target===this)closeSessionDetail()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-5 border-b shrink-0">
+            <div>
+                <h2 class="text-lg font-bold" id="sdTitle">Session Detail</h2>
+                <p class="text-xs text-slate-400" id="sdMeta"></p>
+            </div>
+            <button onclick="closeSessionDetail()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+        </div>
+        <div id="sdBody" class="p-5 overflow-y-auto flex-1 space-y-5">
+            <p class="text-center text-slate-400 py-10">Loading...</p>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -103,16 +119,19 @@ let allCandidates = [];
 
 async function loadCandidates() {
     try {
-        const res = await fetch('/api/candidates', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!res.ok) {
-            document.getElementById('candidatesList').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading candidates</td></tr>';
-            return;
-        }
-        const { data } = await res.json();
-        allCandidates = data.map(c => ({
-            ...c,
-            assessment: c.assessment,
-        }));
+        let page = 1, lastPage = 1;
+        allCandidates = [];
+        do {
+            const res = await fetch(`/api/candidates?page=${page}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) {
+                document.getElementById('candidatesList').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading candidates</td></tr>';
+                return;
+            }
+            const json = await res.json();
+            allCandidates = allCandidates.concat(json.data || []);
+            lastPage = json.meta?.last_page ?? 1;
+            page++;
+        } while (page <= lastPage && page <= 10); // cap at 1000 records (10 pages × 100) for safety
         filterCandidates();
     } catch (err) {
         document.getElementById('candidatesList').innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Error loading candidates</td></tr>';
@@ -190,23 +209,26 @@ function openCandidateModal(email) {
     document.getElementById('modalAssessmentList').innerHTML = entries.map(e => {
         const score = e.test_session?.percentage != null ? parseFloat(e.test_session.percentage).toFixed(1) + '%' : '-';
         const passed = e.test_session?.passed;
-        const passLabel = e.test_session?.percentage != null ? (passed ? '<span class="text-emerald-600 text-xs font-semibold">Passed</span>' : '<span class="text-red-500 text-xs font-semibold">Failed</span>') : '';
-        return `<div class="border rounded-lg p-4 hover:bg-slate-50 transition">
+        const passLabel = e.test_session?.percentage != null ? (passed ? '<span class="text-emerald-600 text-xs font-semibold ml-2">Passed</span>' : '<span class="text-red-500 text-xs font-semibold ml-2">Failed</span>') : '';
+        const clickable = e.test_session ? `onclick="openSessionDetail('${e.assessment_id}', '${e.test_session.id}', '${(e.assessment?.title || 'Assessment').replace(/'/g, '\\&apos;')}')" class="border rounded-xl p-4 hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition group"` : `class="border rounded-xl p-4"`;
+        return `<div ${clickable}>
             <div class="flex items-center justify-between mb-2">
-                <p class="font-semibold text-slate-900">${e.assessment?.title || 'Assessment'}</p>
-                <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[e.status] || ''}">${e.status}</span>
+                <p class="font-semibold text-slate-900 group-hover:text-indigo-700 transition">${e.assessment?.title || 'Assessment'}</p>
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[e.status] || ''}">${e.status}</span>
+                    ${e.test_session ? '<span class="text-xs text-indigo-400 group-hover:text-indigo-600">View Details →</span>' : ''}
+                </div>
             </div>
             <div class="flex items-center justify-between text-sm">
-                <div class="flex items-center gap-4 text-slate-500">
-                    <span>Score: <strong class="text-slate-900">${score}</strong></span>
-                    ${passLabel}
+                <div class="flex items-center gap-1 text-slate-500">
+                    <span>Score: <strong class="text-slate-900">${score}</strong></span>${passLabel}
                 </div>
-                <span class="text-slate-400">${new Date(e.created_at).toLocaleDateString()}</span>
+                <span class="text-slate-400 text-xs">${new Date(e.created_at).toLocaleDateString()}</span>
             </div>
-            ${e.test_session ? `<div class="mt-2 flex gap-4 text-xs text-slate-400">
-                ${e.test_session.tab_switches > 0 ? `<span>⚠ ${e.test_session.tab_switches} tab switch(es)</span>` : ''}
-                ${e.test_session.fullscreen_exits > 0 ? `<span>⚠ ${e.test_session.fullscreen_exits} fullscreen exit(s)</span>` : ''}
-                ${e.test_session.time_spent_seconds ? `<span>⏱ ${Math.round(e.test_session.time_spent_seconds / 60)} min</span>` : ''}
+            ${e.test_session ? `<div class="mt-2 flex gap-3 text-xs text-slate-400">
+                ${e.test_session.tab_switches > 0 ? `<span class="text-amber-600">⚠ ${e.test_session.tab_switches} tab switch(es)</span>` : ''}
+                ${e.test_session.fullscreen_exits > 0 ? `<span class="text-amber-600">⚠ ${e.test_session.fullscreen_exits} fullscreen exit(s)</span>` : ''}
+                ${e.test_session.webcam_recording_url ? '<span class="text-indigo-500">🎥 Recording available</span>' : ''}
             </div>` : ''}
         </div>`;
     }).join('');
@@ -329,6 +351,113 @@ function openCandidateComparison() {
 
 function closeCandidateComparison() {
     document.getElementById('candidateCompareModal').classList.add('hidden');
+}
+
+function buildAnswerHtml(answers) {
+    return answers.map((a, i) => {
+        const correctStyle = a.is_correct ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-200 bg-red-50/50';
+        const icon = a.is_correct ? '<span class="text-emerald-500 font-bold">✓</span>' : '<span class="text-red-500 font-bold">✗</span>';
+        let answerDisplay = '';
+        if (['text_input', 'fill_blank', 'numeric'].includes(a.question_type)) {
+            answerDisplay = `<p class="text-sm mt-2"><b>Candidate:</b> ${a.text_answer || '<em class="text-slate-400">Blank</em>'}</p>
+                             <p class="text-sm text-slate-500 mt-1"><b>Expected:</b> ${a.expected_answer || 'N/A'}</p>`;
+        } else if (['ordering', 'drag_drop_sort', 'matching'].includes(a.question_type)) {
+            answerDisplay = `<p class="text-sm mt-2"><b>Candidate:</b> ${a.text_answer || JSON.stringify(a.selected_options) || '<em class="text-slate-400">Blank</em>'}</p>`;
+        } else {
+            answerDisplay = `<div class="mt-3 space-y-1">${a.options.map((opt, oIdx) => {
+                const isSel = (a.selected_options || []).includes(oIdx.toString());
+                const isExp = opt.is_correct;
+                let style = 'text-slate-600', prefix = '<span class="text-slate-300 w-4 inline-block text-center rounded-full text-[10px] border mr-1">○</span>';
+                if (isSel && isExp) { style = 'text-emerald-700 font-medium'; prefix = '<span class="text-emerald-600 w-4 inline-block text-center rounded-full text-[10px] border border-emerald-500 bg-emerald-50 mr-1">✓</span>'; }
+                else if (isSel && !isExp) { style = 'text-red-600'; prefix = '<span class="text-red-500 w-4 inline-block text-center rounded-full text-[10px] border border-red-500 bg-red-50 mr-1">✗</span>'; }
+                else if (!isSel && isExp) { style = 'text-emerald-600 font-medium'; prefix = '<span class="text-emerald-500 w-4 inline-block text-center rounded-full text-[10px] border border-emerald-500 border-dashed mr-1">✓</span>'; }
+                return `<p class="text-sm ${style}">${prefix} ${opt.text}</p>`;
+            }).join('')}</div>`;
+        }
+        return `<div class="border rounded-xl p-4 ${correctStyle}"><div class="flex gap-3">
+            <span class="font-bold text-slate-700 border-r pr-3">${i + 1}.</span>
+            <div class="flex-1 min-w-0"><p class="font-medium text-slate-900 break-words">${a.question_text}</p>${answerDisplay}</div>
+            <div class="text-right shrink-0">${icon}<p class="text-xs text-slate-500 mt-1 shadow-sm px-2 py-0.5 rounded-full bg-white">${a.points_earned} / ${a.max_points}</p></div>
+        </div></div>`;
+    }).join('');
+}
+
+async function openSessionDetail(assessmentId, sessionId, title) {
+    const modal = document.getElementById('sessionDetailModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.getElementById('sdTitle').textContent = title;
+    document.getElementById('sdMeta').textContent = 'Loading session data...';
+    document.getElementById('sdBody').innerHTML = '<p class="text-center text-slate-400 py-10">Loading...</p>';
+
+    try {
+        const res = await fetch(`/api/assessments/${assessmentId}/sessions/${sessionId}/answers`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const s = data.session || {};
+
+        document.getElementById('sdMeta').textContent = s.email || '';
+
+        // --- Video Section ---
+        const videoHtml = s.webcam_recording_url ? `
+        <div class="rounded-xl overflow-hidden bg-black">
+            <video controls class="w-full max-h-64" src="${s.webcam_recording_url}"></video>
+        </div>
+        <div class="flex gap-2">
+            <a href="${s.webcam_recording_url}" download target="_blank" class="flex-1 text-center py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition">⬇ Download Recording</a>
+            <a href="${s.webcam_recording_url}" target="_blank" class="flex-1 text-center py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 transition">↗ Open in New Tab</a>
+        </div>` : `<div class="rounded-xl border-2 border-dashed border-slate-200 p-6 text-center text-slate-400 text-sm">No video recording available</div>`;
+
+        // --- Proctoring Section ---
+        const tabSw = s.tab_switches || 0;
+        const fsEx = s.fullscreen_exits || 0;
+        const mins = s.time_spent_seconds ? Math.round(s.time_spent_seconds / 60) : '-';
+        const riskLevel = (tabSw + fsEx) === 0 ? {label:'Low Risk', cls:'text-emerald-600 bg-emerald-50'} : (tabSw + fsEx) <= 3 ? {label:'Medium Risk', cls:'text-amber-600 bg-amber-50'} : {label:'High Risk', cls:'text-red-600 bg-red-50'};
+        const procHtml = `
+        <div class="rounded-xl border p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-slate-800">🔍 Proctoring Report</h3>
+                <span class="text-xs font-bold px-2 py-1 rounded-full ${riskLevel.cls}">${riskLevel.label}</span>
+            </div>
+            <div class="grid grid-cols-3 gap-3 text-center">
+                <div class="bg-slate-50 rounded-lg p-3"><p class="text-xl font-bold ${tabSw > 0 ? 'text-amber-600' : 'text-slate-700'}">${tabSw}</p><p class="text-xs text-slate-500">Tab Switches</p></div>
+                <div class="bg-slate-50 rounded-lg p-3"><p class="text-xl font-bold ${fsEx > 0 ? 'text-amber-600' : 'text-slate-700'}">${fsEx}</p><p class="text-xs text-slate-500">Fullscreen Exits</p></div>
+                <div class="bg-slate-50 rounded-lg p-3"><p class="text-xl font-bold text-slate-700">${mins}</p><p class="text-xs text-slate-500">Minutes Spent</p></div>
+            </div>
+            ${s.ip_address ? `<p class="text-xs text-slate-400 mt-3">IP: ${s.ip_address} &nbsp;|&nbsp; Browser: ${(s.user_agent||'').substring(0,60)}...</p>` : ''}
+        </div>`;
+
+        // --- Score Section ---
+        const pct = s.percentage != null ? parseFloat(s.percentage).toFixed(1) : null;
+        const scoreHtml = pct !== null ? `
+        <div class="rounded-xl border p-4 flex items-center justify-between">
+            <div><h3 class="font-semibold text-slate-800">📊 Score</h3><p class="text-xs text-slate-400">${s.total_score ?? '-'} / ${s.max_score ?? '-'} points</p></div>
+            <div class="text-right">
+                <p class="text-3xl font-extrabold ${s.passed ? 'text-emerald-600' : 'text-red-500'}">${pct}%</p>
+                <p class="text-xs font-semibold ${s.passed ? 'text-emerald-600' : 'text-red-500'}">${s.passed ? '✓ Passed' : '✗ Failed'}</p>
+            </div>
+        </div>` : '';
+
+        // --- Answers Section ---
+        const answersHtml = data.answers?.length ? `
+        <div>
+            <h3 class="font-semibold text-slate-800 mb-3">📝 Answers (${data.answers.length})</h3>
+            <div class="space-y-3">${buildAnswerHtml(data.answers)}</div>
+        </div>` : '';
+
+        document.getElementById('sdBody').innerHTML = videoHtml + procHtml + scoreHtml + answersHtml;
+    } catch (e) {
+        document.getElementById('sdBody').innerHTML = '<p class="text-center text-red-500 py-10">Failed to load session data.</p>';
+    }
+}
+
+function closeSessionDetail() {
+    document.getElementById('sessionDetailModal').classList.add('hidden');
+    document.getElementById('sessionDetailModal').classList.remove('flex');
+    // Pause any playing video to stop audio
+    document.querySelectorAll('#sessionDetailModal video').forEach(v => v.pause());
 }
 
 loadCandidates();

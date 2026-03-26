@@ -31,33 +31,38 @@ class FraudDetectionService
             ]);
         }
 
-        // Check fuzzy email match
+        // Check fuzzy email match (Downgraded to flag/log instead of block)
         $fuzzyEmailMatch = $this->checkFuzzyEmailMatch($assessmentId, $email);
         if ($fuzzyEmailMatch) {
-            return $this->logAndBlock($assessmentId, 'email_fuzzy', $fuzzyEmailMatch['session'], [
+            logger()->info('Similar email detected for assessment', [
+                'assessment_id' => $assessmentId,
                 'email' => $email,
-                'ip_address' => $ipAddress,
-                'device_fingerprint' => $deviceFingerprint,
-            ], $fuzzyEmailMatch['similarity']);
+                'previous_session' => $fuzzyEmailMatch['session']->id,
+                'similarity' => $fuzzyEmailMatch['similarity'],
+            ]);
         }
 
-        // Check name similarity
+        // Check name similarity (Downgraded to just flag/log instead of block)
         $nameMatch = $this->checkNameSimilarity($assessmentId, $firstName, $lastName);
         if ($nameMatch) {
-            return $this->logAndBlock($assessmentId, 'name_fuzzy', $nameMatch['session'], [
-                'email' => $email,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-            ], $nameMatch['similarity']);
+            logger()->info('Similar name detected for assessment', [
+                'assessment_id' => $assessmentId,
+                'name' => $firstName . ' ' . $lastName,
+                'previous_session' => $nameMatch['session']->id,
+                'similarity' => $nameMatch['similarity'],
+            ]);
+            // We no longer block on name similarity since two users can legitimately have the same name.
         }
 
-        // Check device fingerprint
+        // Check device fingerprint (Downgraded to flag/log instead of block)
         if ($deviceFingerprint) {
             $deviceMatch = $this->checkDeviceFingerprint($assessmentId, $deviceFingerprint);
             if ($deviceMatch) {
-                return $this->logAndBlock($assessmentId, 'device', $deviceMatch, [
+                logger()->info('Same device detected for assessment', [
+                    'assessment_id' => $assessmentId,
                     'email' => $email,
                     'device_fingerprint' => $deviceFingerprint,
+                    'previous_session' => $deviceMatch->id,
                 ]);
             }
         }

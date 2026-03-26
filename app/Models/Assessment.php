@@ -105,8 +105,9 @@ class Assessment extends Model
         return $this->status === 'completed' || ($this->end_datetime && $this->end_datetime->isPast());
     }
 
-    public function getMaxScoreAttribute(): int
+    public function getMaxScoreAttribute(): float
     {
-        return $this->questions->sum('points');
+        // DB aggregate — no lazy-load of all questions
+        return (float) $this->questions()->sum('points');
     }
 }
