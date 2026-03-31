@@ -16,7 +16,7 @@ class FeatureFlagSeeder extends Seeder
 
             // Proctoring
             ['key' => 'proctoring_enabled', 'name' => 'Proctoring', 'description' => 'Allow assessment creators to enable proctoring', 'category' => 'proctoring', 'enabled' => true],
-            ['key' => 'webcam_recording', 'name' => 'Webcam Recording', 'description' => 'Enable webcam recording via Cloudinary during tests', 'category' => 'proctoring', 'enabled' => false],
+            ['key' => 'webcam_recording', 'name' => 'Webcam Recording', 'description' => 'Enable webcam recording via Cloudinary during tests', 'category' => 'proctoring', 'enabled' => true],
             ['key' => 'auto_end_on_leave', 'name' => 'Auto-End on Tab Switch', 'description' => 'Allow auto-end when candidates switch tabs', 'category' => 'proctoring', 'enabled' => true],
 
             // Assessment Features
